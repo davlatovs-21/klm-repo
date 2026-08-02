@@ -1,26 +1,183 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-bg: #eef2f4;
+  --color-surface: #ffffff;
+  --color-ink: #0b1a21;
+  --color-ink-2: #16303c;
+  --color-mute: #61798a;
+  --color-line: #dfe7eb;
+  --color-line-2: #c9d6dd;
+  --color-cur: #00aec0;
+  --color-cur-d: #00808f;
+  --color-cur-soft: #e0f7f9;
+  --color-fault: #e24a5e;
+  --color-fault-soft: #fdecee;
+  --color-copper: #b4703a;
+
+  --font-display: var(--font-unbounded), sans-serif;
+  --font-sans: var(--font-manrope), -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-mono-code), ui-monospace, monospace;
+
+  --radius-xl2: 18px;
+
+  --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-cur);
+  color: #fff;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--color-cur);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+@utility display {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+@utility eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* сетка «шинопровода» на тёмных блоках */
+@utility busgrid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+
+@keyframes flow {
+  to {
+    transform: translateX(100%);
+  }
+}
+/* бегущий ток по проводнику */
+@keyframes dash {
+  to {
+    stroke-dashoffset: -32;
+  }
+}
+@keyframes blip {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes draw {
+  from {
+    stroke-dashoffset: var(--len, 300);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes pop {
+  from {
+    transform: scale(0.94);
+  }
+}
+@keyframes up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes inR {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+}
+@keyframes inL {
+  from {
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+}
+
+.anim-up {
+  animation: up 0.4s var(--ease-out-expo) both;
+}
+.anim-r {
+  animation: inR 0.34s var(--ease-out-expo);
+}
+.anim-l {
+  animation: inL 0.34s var(--ease-out-expo);
+}
+.anim-pop > * {
+  animation: pop 0.32s var(--ease-out-expo);
+}
+.anim-dash {
+  stroke-dasharray: 6 10;
+  animation: dash 1.1s linear infinite;
+}
+.anim-blip {
+  animation: blip 1.8s ease-in-out infinite;
+}
+.anim-draw {
+  animation: draw 0.9s var(--ease-out-expo) both;
+}
+.anim-flow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.75), transparent);
+  transform: translateX(-100%);
+  animation: flow 2.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .anim-up,
+  .anim-r,
+  .anim-l,
+  .anim-pop > *,
+  .anim-dash,
+  .anim-blip,
+  .anim-draw,
+  .anim-flow::after {
+    animation: none !important;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+  .print-plain {
+    background: #fff !important;
+    color: #000 !important;
+    border: 1px solid #000;
+  }
 }

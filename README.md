@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# KLM · Онлайн-панель подбора КОМ
 
-## Getting Started
+Концепт-прототип веб-приложения для подбора коробок отбора мощности (КОМ) к шинопроводу KLM.
+Сделан по техническому заданию «Онлайн-панель подбора КОМ KLM», редакция 2.0.
 
-First, run the development server:
+Инженер вводит параметры трассы и отвода — панель проверяет конфигурацию по девяти правилам
+справочника, подбирает минимальный достаточный корпус и собирает код заказа из девяти позиций.
+Недопустимая конфигурация в заказ не уходит.
+
+> **Данные условные.** Справочник моделей, числовые пределы и грамматика кода заказа подставлены
+> для демонстрации логики. Реальный справочник заменяется без изменения интерфейса.
+
+## Страницы
+
+| Путь | Содержание |
+|---|---|
+| `/` | Лендинг: проблема, метрики «сейчас/после», четыре шага, девять правил, архитектура, сроки |
+| `/demo` | Рабочий конфигуратор: живой артикул, проверки, автоисправление, печать, ссылка на конфигурацию |
+| `/scope` | Границы первого этапа, что исключено и почему, этапы работ, сценарии приёмки |
+| `/data` | Этап 0: какие справочные данные нужны от Заказчика, порядок приёмки, открытые вопросы |
+
+## Как это устроено
+
+Статическое приложение, весь расчёт выполняется в браузере — ни сервера приложений, ни базы данных.
+
+- `lib/catalog.ts` — справочник: серии, модели, токи, аппараты защиты, степени защиты
+- `lib/engine.ts` — расчётный модуль: девять правил, алгоритм подбора, сборка кода заказа,
+  кодирование конфигурации в адрес страницы. Не зависит от интерфейса
+- `components/` — интерфейс: конфигуратор, инлайновые SVG-иконки и живые схемы
+- `app/` — четыре страницы на Next.js App Router
+
+Иконки и иллюстрации — инлайновый SVG без внешних библиотек. Анимация задаётся CSS-классами,
+поэтому `prefers-reduced-motion` отключает движение автоматически.
+
+## Разработка
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev     # http://localhost:3000
+npm test        # тесты расчётного модуля
+npm run build   # статическая сборка
+npm run lint
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Стек: Next.js 16 (App Router, Turbopack), React 19, TypeScript, Tailwind CSS v4.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Замена справочника на реальный
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Правятся только `lib/catalog.ts` (данные) и, при необходимости, числовые пороги в `lib/engine.ts`
+(`LOAD_SHARE`, `HANDLE_THRESHOLD` объявлены в `lib/catalog.ts`). Интерфейс и вёрстка не затрагиваются.
