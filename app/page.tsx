@@ -104,8 +104,12 @@ export default function Home() {
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Btn href="/demo" variant="cur">Открыть демо →</Btn>
-              <Btn href="/scope" variant="ghost">Объём и сроки</Btn>
+              <Btn href="/podbor" variant="ghost">Выбор шинопровода</Btn>
             </div>
+            <p className="mt-4 text-[12.5px] text-[#61798a]">
+              Панель <Link href="/podbor" className="font-semibold text-cur underline decoration-cur/40 underline-offset-4">выбора шинопровода</Link>{" "}
+              работает на реальном каталоге КЛМ: расчёт тока, серия, номинал, коробки отбора.
+            </p>
 
             <dl className="mt-9 grid grid-cols-3 gap-3 border-t border-white/10 pt-6 sm:gap-4">
               {[

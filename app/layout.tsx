@@ -15,6 +15,7 @@ export const metadata: Metadata = {
 };
 
 const NAV = [
+  { href: "/podbor", label: "Выбор шинопровода" },
   { href: "/demo", label: "Демо" },
   { href: "/scope", label: "Объём и сроки" },
   { href: "/data", label: "Что нужно от вас" },
@@ -32,8 +33,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <header className="no-print sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur-xl">
           <nav className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2.5 sm:px-5 sm:py-3">
             <Link href="/" className="group flex min-w-0 items-center gap-2.5">
-              <span className="grid h-9 w-9 flex-none place-items-center rounded-[10px] bg-ink text-[12px] font-bold text-cur transition-transform duration-300 group-hover:scale-105">
-                KL
+              <span className="grid h-9 w-9 flex-none place-items-center rounded-[10px] bg-ink transition-transform duration-300 group-hover:scale-105">
+                {/* eslint-disable-next-line @next/next/no-img-element -- статичный логотип 28px, оптимизация не нужна */}
+                <img src="/klm/logo.png" alt="КЛМ" width={24} height={24} className="h-6 w-6" />
               </span>
               <span className="min-w-0 leading-tight">
                 <span className="display block whitespace-nowrap text-[14px] sm:text-[15px]">Подбор КОМ</span>

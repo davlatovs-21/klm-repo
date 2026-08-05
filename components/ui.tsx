@@ -39,6 +39,44 @@ export function Head({
   );
 }
 
+/** Кнопка-вариант в строке параметров. off — вариант недопустим для текущей конфигурации */
+export function Opt({
+  on, off, onClick, children, sub,
+}: {
+  on?: boolean; off?: boolean; onClick: () => void; children: ReactNode; sub?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={on}
+      className={`min-w-[54px] rounded-xl border-[1.5px] px-3.5 py-2 text-left transition-all duration-200 ${
+        off && on
+          ? "border-fault bg-fault text-white"
+          : on
+            ? "border-ink bg-ink text-white shadow-[0_8px_18px_-10px_rgba(11,26,33,0.7)]"
+            : off
+              ? "border-line bg-surface opacity-35"
+              : "border-line bg-surface hover:-translate-y-px hover:border-cur"
+      }`}
+    >
+      <span className="block font-mono text-[13.5px] font-bold">{children}</span>
+      {sub && <span className={`block text-[10.5px] font-medium ${on ? "text-[#8fb4c0]" : "text-mute"}`}>{sub}</span>}
+    </button>
+  );
+}
+
+export function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+  return (
+    <div className="grid gap-2 border-t border-line py-3.5 sm:grid-cols-[200px_1fr] sm:gap-4">
+      <div>
+        <span className="block text-[13.5px] font-semibold">{label}</span>
+        {hint && <span className="mt-0.5 block text-[11.5px] leading-snug text-mute">{hint}</span>}
+      </div>
+      <div className="flex flex-wrap content-start gap-1.5">{children}</div>
+    </div>
+  );
+}
+
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <div

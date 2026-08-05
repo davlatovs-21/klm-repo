@@ -1,0 +1,52 @@
+[
+ {
+  "position": 1,
+  "name": "Магистральные шинопроводы ШМА 630–10 000 А",
+  "path": "/catalog/shinoprovod-magistralnyy"
+ },
+ {
+  "position": 2,
+  "name": "Распределительные шинопроводы ШРА 250–1600 А",
+  "path": "/catalog/shinoprovod-raspredelitelnyy"
+ },
+ {
+  "position": 3,
+  "name": "Токопроводы 6 / 10 / 35 кВ",
+  "path": "/catalog/tokoprovod"
+ },
+ {
+  "position": 4,
+  "name": "НКУ — ГРЩ, ВРУ, АВР",
+  "path": "/catalog/nku-shchitovoe"
+ },
+ {
+  "position": 5,
+  "name": "КРУЭ и КТП",
+  "path": "/catalog/krue-ktp"
+ },
+ {
+  "position": 6,
+  "name": "Лотки и металлоконструкции",
+  "path": "/catalog/lotki-konstrukcii"
+ },
+ {
+  "position": 7,
+  "name": "Компенсаторы медные и алюминиевые",
+  "path": "/catalog/kompensatory-mednye-alyuminievye"
+ },
+ {
+  "position": 8,
+  "name": "Решения для ЦОД",
+  "path": "/catalog/resheniya-dlya-cod"
+ },
+ {
+  "position": 9,
+  "name": "Троллейный шинопровод",
+  "path": "/catalog/trolley"
+ },
+ {
+  "position": 10,
+  "name": "Оборудование для производства шинопровода",
+  "path": "/catalog/oborudovanie-dlya-proizvodstva-shinoprovoda"
+ }
+]
