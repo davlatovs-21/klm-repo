@@ -25,8 +25,8 @@ function Num({
   min?: number;
 }) {
   return (
-    <label className="flex min-w-[132px] flex-1 flex-col gap-1">
-      <span className="text-[11.5px] font-semibold text-mute">{label}</span>
+    <label className="flex flex-col gap-1">
+      <span className="text-[11.5px] font-semibold leading-tight text-mute">{label}</span>
       <span className="flex items-baseline gap-1.5 rounded-xl border-[1.5px] border-line bg-surface px-3 py-2 focus-within:border-cur">
         <input
           type="number"
@@ -138,7 +138,8 @@ export default function BusbarSelector() {
             </Opt>
           </Row>
 
-          <div className="flex flex-wrap gap-2 border-t border-line py-3.5">
+          {/* items-end держит поля на одной линии, даже если подпись переносится на две строки */}
+          <div className="grid grid-cols-2 items-end gap-2 border-t border-line py-3.5 sm:grid-cols-3">
             {s.mode === "power" ? (
               <>
                 <Num label="Мощность нагрузки" unit="кВт" value={s.powerKW} onChange={(v) => set("powerKW", v)} step={10} />
@@ -147,9 +148,7 @@ export default function BusbarSelector() {
             ) : (
               <Num label="Расчётный ток" unit="А" value={s.currentA} onChange={(v) => set("currentA", v)} step={10} />
             )}
-            <Num label="Коэф. одновременности" unit="Kс" value={s.demand} onChange={(v) => set("demand", v)} step={0.05} />
-            <Num label="Температура среды" unit="°C" value={s.ambientC} onChange={(v) => set("ambientC", v)} step={5} />
-            <Num label="Длина трассы" unit="м" value={s.routeLenM} onChange={(v) => set("routeLenM", v)} step={5} />
+            <Num label="Одновременность" unit="Kс" value={s.demand} onChange={(v) => set("demand", v)} step={0.05} />
           </div>
 
           <Row label="Напряжение">
@@ -193,6 +192,11 @@ export default function BusbarSelector() {
               </Opt>
             ))}
           </Row>
+
+          <div className="grid grid-cols-2 items-end gap-2 border-t border-line py-3.5 sm:grid-cols-3">
+            <Num label="Температура среды" unit="°C" value={s.ambientC} onChange={(v) => set("ambientC", v)} step={5} />
+            <Num label="Длина трассы" unit="м" value={s.routeLenM} onChange={(v) => set("routeLenM", v)} step={5} />
+          </div>
 
           {hasTaps && (
             <>

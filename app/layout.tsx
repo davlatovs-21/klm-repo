@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import { Unbounded, Manrope, JetBrains_Mono } from "next/font/google";
 import Link from "next/link";
 import MobileNav from "@/components/MobileNav";
+import { SNAPSHOT } from "@/lib/klm-catalog";
 import "./globals.css";
+
+const SNAPSHOT_RU = new Date(SNAPSHOT).toLocaleDateString("ru-RU");
 
 const unbounded = Unbounded({ variable: "--font-unbounded", subsets: ["latin", "cyrillic"], weight: ["500", "600"] });
 const manrope = Manrope({ variable: "--font-manrope", subsets: ["latin", "cyrillic"] });
@@ -26,8 +29,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ru">
       <body className={`${unbounded.variable} ${manrope.variable} ${mono.variable} antialiased`}>
         <div className="no-print bg-ink px-4 py-2 text-center text-[10px] font-semibold uppercase leading-snug tracking-[0.08em] text-[#8fb4c0] sm:text-[11px] sm:tracking-[0.1em]">
-          Демонстрационный прототип · <b className="text-cur">данные условные</b>
-          <span className="hidden sm:inline"> · не для проектирования</span>
+          Справочник шинопроводов — <b className="text-cur">с сайта КЛМ, снимок {SNAPSHOT_RU}</b>
+          <span className="hidden sm:inline"> · справочник КОМ условный · проверяйте подбор у инженера</span>
         </div>
 
         <header className="no-print sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur-xl">
@@ -71,7 +74,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="mx-auto flex max-w-6xl flex-col gap-3 px-5 py-8 text-[12.5px] text-mute sm:flex-row sm:items-center sm:justify-between">
             <p className="max-w-xl">
               Прототип интерфейса по техническому заданию «Онлайн-панель подбора КОМ KLM», редакция 2.0.
-              Справочник моделей, правила и структура кода заказа условные.
+              Серии шинопроводов, ряды номиналов и коробки отбора взяты с сайта КЛМ (снимок {SNAPSHOT_RU})
+              и хранятся в проекте локально. Справочник моделей КОМ и структура кода заказа пока условные.
             </p>
             <div className="flex gap-4">
               {NAV.map((n) => (
