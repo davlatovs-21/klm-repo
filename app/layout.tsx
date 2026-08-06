@@ -19,6 +19,7 @@ export const metadata: Metadata = {
 
 const NAV = [
   { href: "/podbor", label: "Выбор шинопровода" },
+  { href: "/sravnenie", label: "Против кабеля" },
   { href: "/demo", label: "Демо" },
   { href: "/scope", label: "Объём и сроки" },
   { href: "/data", label: "Что нужно от вас" },

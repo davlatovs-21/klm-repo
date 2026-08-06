@@ -13,6 +13,7 @@ import {
   type BusbarSeries,
   type Duty,
 } from "./klm-catalog";
+import type { TraceStep } from "./electrical";
 
 export type Input = {
   duty: Duty;
@@ -83,6 +84,8 @@ export type Result = {
   /** Подобранные КОМ под токи отводов */
   tapBoxes: { requestedA: number; boxA: number | null; viaSection: boolean }[];
   checks: Check[];
+  /** Как получен ответ — раздел 7.12 ТЗ, печатается в расчётной записке */
+  trace: TraceStep[];
   productPath: string | null;
   sourceUrl: string;
 };
@@ -173,6 +176,21 @@ export function selectBusbar(input: Input): Result {
       ? input.currentA
       : (input.powerKW * 1000 * input.demand) / (Math.sqrt(3) * u * input.cosPhi);
 
+  const trace: TraceStep[] = [
+    input.mode === "current"
+      ? {
+          what: "Расчётный ток нагрузки",
+          result: `${round(loadA)} А`,
+          norm: "задан проектом; коэффициент одновременности в нём уже учтён",
+        }
+      : {
+          what: "Расчётный ток нагрузки",
+          formula: "I_load = P · 1000 · K_с / (√3 · U · cos φ)",
+          substitution: `${input.powerKW} · 1000 · ${input.demand} / (1,732 · ${u} · ${input.cosPhi})`,
+          result: `${round(loadA)} А`,
+        },
+  ];
+
   const kt = derating(input.ambientC);
   const km = MOUNT_FACTOR[input.mountWay];
   const kg = groupFactor(input.parallelRuns);
@@ -180,6 +198,34 @@ export function selectBusbar(input: Input): Result {
   const k = Number((kt * km * kg * kh).toFixed(4));
   const requiredA = loadA / k;
   const ratedA = nextRated(s.currents, requiredA);
+
+  trace.push({
+    what: "Поправка на условия прокладки",
+    formula: "k = k_t · k_m · k_g · k_h",
+    substitution: `${kt} · ${km} · ${kg} · ${kh}`,
+    result: String(k),
+    norm: `k_t от 35 °C по ГОСТ Р МЭК 61439-1 (задано ${input.ambientC} °C); k_m ${MOUNT_LABEL[input.mountWay].toLowerCase()}; k_g ${input.parallelRuns} трасс рядом; k_h ${input.altitudeM} м`,
+  });
+  trace.push({
+    what: "Требуемый допустимый ток",
+    formula: "I_required = I_load / k",
+    substitution: `${round(loadA)} / ${k}`,
+    result: `${round(requiredA)} А`,
+  });
+  trace.push({
+    what: `Номинал из ряда ${s.name}`,
+    formula: "I_rated = min{ I ∈ ряд : I ≥ I_required }",
+    substitution: s.currents.map((c) => (c === ratedA ? `[${c}]` : String(c))).join(" · "),
+    result: ratedA != null ? `${ratedA} А` : "ряда не хватает",
+  });
+  if (ratedA != null)
+    trace.push({
+      what: "Запас по току",
+      formula: "reserve = (I_rated − I_load) / I_load · 100",
+      substitution: `(${ratedA} − ${round(loadA)}) / ${round(loadA)} · 100`,
+      result: `${round(((ratedA - loadA) / loadA) * 100)} %`,
+      norm: `проектная норма ${RESERVE_MIN_PCT}–35 %`,
+    });
 
   if (input.ambientC > AMBIENT_MAX_C)
     checks.push({
@@ -354,6 +400,7 @@ export function selectBusbar(input: Input): Result {
     sections,
     tapBoxes,
     checks,
+    trace,
     productPath: path,
     sourceUrl: src(path ?? s.source),
   };

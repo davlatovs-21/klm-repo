@@ -299,6 +299,38 @@ export default function BusbarSelector() {
             </a>
           </div>
 
+          {/* трассировка расчёта — раздел 7.12 ТЗ */}
+          <details className="mt-4 rounded-xl2 border border-line bg-surface p-4 [&[open]>summary>span:last-child]:rotate-180">
+            <summary className="flex cursor-pointer list-none items-center justify-between">
+              <span className="eyebrow text-mute">Как посчитано</span>
+              <span className="text-[11px] text-mute transition-transform duration-200">▾</span>
+            </summary>
+            <ol className="mt-3">
+              {r.trace.map((t, i) => (
+                <li key={i} className="border-t border-line py-2.5 first:border-0">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-[12.5px] font-semibold leading-snug">
+                      <span className="mr-1.5 font-mono text-[11px] text-mute">{i + 1}</span>
+                      {t.what}
+                    </span>
+                    <span className="flex-none font-mono text-[12.5px] font-bold text-cur-d">{t.result}</span>
+                  </div>
+                  {t.formula && (
+                    <p className="mt-1 font-mono text-[11.5px] leading-snug text-ink-2">{t.formula}</p>
+                  )}
+                  {t.substitution && (
+                    <p className="mt-0.5 font-mono text-[11px] leading-snug text-mute">= {t.substitution}</p>
+                  )}
+                  {t.norm && <p className="mt-1 text-[11px] leading-snug text-mute">{t.norm}</p>}
+                </li>
+              ))}
+            </ol>
+            <p className="mt-3 border-t border-dashed border-line-2 pt-2.5 text-[11px] leading-snug text-mute">
+              Этот блок печатается в расчётной записке. Падение напряжения, потери и стойкость к КЗ
+              включатся, когда КЛМ передаст R, X, I_cw и I_pk по номиналам.
+            </p>
+          </details>
+
           {/* проверки */}
           <div className="mt-4 rounded-xl2 border border-line bg-surface p-4">
             <h3 className="eyebrow text-mute">Проверки ({r.checks.length})</h3>
