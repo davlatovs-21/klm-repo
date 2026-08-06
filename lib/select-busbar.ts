@@ -77,13 +77,42 @@ export type Result = {
 
 /**
  * Снижение допустимого тока от температуры среды.
- * ponytail: линейная аппроксимация 1 %/°C выше 40 °C — заменить таблицей КЛМ,
- * когда заказчик передаст кривые derating по ГОСТ Р МЭК 61439-6.
+ *
+ * Номинальный ток шинопровода нормируется при среднесуточной температуре воздуха 35 °C
+ * (максимум 40 °C) — ГОСТ Р МЭК 61439-1 / IEC 61439-1, отсчёт ведётся от 35 °C, не от 40 °C.
+ * Ряд коэффициентов — типовая таблица шинопроводов этого класса (Canalis KS/KTA, k1):
+ * 35 → 1,00 · 40 → 0,97 · 45 → 0,94 · 50 → 0,90 · 55 → 0,86, между точками линейно.
+ *
+ * ponytail: таблица отраслевая, не заводская. Заменить кривыми КЛМ по ГОСТ Р МЭК 61439-6,
+ * когда заказчик их передаст (ТЗ, открытый вопрос 4). Ниже 35 °C повышающий коэффициент
+ * не применяется сознательно — запас в пользу проекта.
  */
+export const DERATING_TABLE: [number, number][] = [
+  [35, 1], [40, 0.97], [45, 0.94], [50, 0.9], [55, 0.86],
+];
+/** Выше этой температуры таблицы нет — конфигурация уходит на согласование с заводом */
+export const AMBIENT_MAX_C = DERATING_TABLE[DERATING_TABLE.length - 1][0];
+
 export function derating(ambientC: number): number {
-  if (ambientC <= 40) return 1;
-  return Math.max(0.6, 1 - 0.01 * (ambientC - 40));
+  if (ambientC <= DERATING_TABLE[0][0]) return 1;
+  for (let i = 1; i < DERATING_TABLE.length; i++) {
+    const [t0, k0] = DERATING_TABLE[i - 1];
+    const [t1, k1] = DERATING_TABLE[i];
+    if (ambientC <= t1) return Number((k0 + ((k1 - k0) * (ambientC - t0)) / (t1 - t0)).toFixed(4));
+  }
+  // за таблицей продолжаем последним наклоном, но не ниже 0,6 — дальше только расчёт завода
+  const [tl, kl] = DERATING_TABLE[DERATING_TABLE.length - 1];
+  const [tp, kp] = DERATING_TABLE[DERATING_TABLE.length - 2];
+  const slope = (kl - kp) / (tl - tp);
+  return Math.max(0.6, Number((kl + slope * (ambientC - tl)).toFixed(4)));
 }
+
+/** Запас по току, ниже которого трасса считается натянутой (ТЗ 7.12: норма 15–35 %) */
+export const RESERVE_MIN_PCT = 15;
+
+/** Длина трассы, от которой ΔU перестаёт быть формальностью и решает выбор номинала */
+export const DROP_CHECK_LEN_M = 50;
+const routeLenNeedsDropCheck = (m: number) => m >= DROP_CHECK_LEN_M;
 
 const nextRated = (currents: number[], need: number) => currents.find((c) => c >= need) ?? null;
 const round = (x: number, n = 0) => Number(x.toFixed(n));
@@ -101,14 +130,26 @@ export function selectBusbar(input: Input): Result {
   const checks: Check[] = [];
 
   const u = input.voltageV;
+  /**
+   * Ток нагрузки. По мощности: I = P·Kс / (√3·U·cosφ).
+   * В режиме ввода тока Kс НЕ применяется второй раз — пользователь вводит уже
+   * расчётный ток проекта, в котором одновременность учтена.
+   */
   const loadA =
     input.mode === "current"
-      ? input.currentA * input.demand
+      ? input.currentA
       : (input.powerKW * 1000 * input.demand) / (Math.sqrt(3) * u * input.cosPhi);
 
   const k = derating(input.ambientC);
   const requiredA = loadA / k;
   const ratedA = nextRated(s.currents, requiredA);
+
+  if (input.ambientC > AMBIENT_MAX_C)
+    checks.push({
+      level: "warn",
+      text: `Таблица поправок доведена до ${AMBIENT_MAX_C} °C, задано ${input.ambientC} °C`,
+      fix: "коэффициент экстраполирован — подтвердить допустимый ток в КЛМ",
+    });
 
   // --- напряжение ---
   if (u > s.voltageV)
@@ -150,7 +191,10 @@ export function selectBusbar(input: Input): Result {
     checks.push({
       level: "warn",
       text: `Для этой среды нужен IP${wantIp}, серия ${s.name} даёт максимум IP${Math.max(...s.ip)}`,
-      fix: "литой магистральный шинопровод IP68",
+      // совет по IP68 относится только к низковольтным сериям: ТПЛ — это 6–35 кВ, ШМА его не заменит
+      fix: s.duty === "mv"
+        ? "ТПЛ выпускается в наружном исполнении — согласовать степень защиты по опроснику КЛМ"
+        : "литой магистральный шинопровод IP68",
     });
 
   // --- огнестойкость ---
@@ -162,10 +206,12 @@ export function selectBusbar(input: Input): Result {
     });
 
   // --- отводы ---
+  // предел на одно окно — из справочника серии, а не из общей константы
+  const windowMax = s.tapMaxA ?? TAP_WINDOW_MAX;
   const tapBoxes = input.taps.map((requestedA) => ({
     requestedA,
     boxA: nextRated(TAP_BOXES, requestedA),
-    viaSection: requestedA > TAP_WINDOW_MAX,
+    viaSection: requestedA > windowMax,
   }));
 
   if (input.taps.length > 0 && s.tapMaxA == null)
@@ -176,13 +222,21 @@ export function selectBusbar(input: Input): Result {
     });
 
   if (s.tapMaxA != null) {
+    const compat = s.tapBoxCompatA;
+    if (compat != null && ratedA != null && input.taps.length > 0 && ratedA < compat[0])
+      checks.push({
+        level: "error",
+        text: `КОМ встают на ${s.name} ${compat[0]}–${compat[1]} А, подобрано ${ratedA} А`,
+        fix: `поднять номинал трассы до ${compat[0]} А или снять нагрузку кабелем от щита`,
+      });
+
     for (const t of tapBoxes) {
       if (t.boxA == null)
         checks.push({ level: "error", text: `Отвод ${t.requestedA} А выше ряда КОМ (максимум ${TAP_BOXES.at(-1)} А)` });
       else if (t.viaSection)
         checks.push({
           level: "warn",
-          text: `Отвод ${t.requestedA} А больше ${TAP_WINDOW_MAX} А на окно`,
+          text: `Отвод ${t.requestedA} А больше ${windowMax} А на окно`,
           fix: `КОМ ${t.boxA} А ставится на секцию отбора, не в стандартное окно`,
         });
     }
@@ -190,18 +244,53 @@ export function selectBusbar(input: Input): Result {
     if (ratedA != null && tapSum > ratedA)
       checks.push({
         level: "error",
-        text: `Сумма отводов ${tapSum} А превышает номинал магистрали ${ratedA} А`,
-        fix: "поднять номинал трассы или разнести нагрузку на две трассы",
+        text: `Сумма отводов ${tapSum} А превышает номинал магистрали ${ratedA} А (коэффициент одновременности принят 1,0)`,
+        fix: "поднять номинал трассы, разнести нагрузку на две трассы или подтвердить Kс отводов в КЛМ",
       });
 
-    const pitch = Math.min(...s.tapPitchM);
-    const windows = Math.floor(input.routeLenM / pitch);
-    if (input.taps.length > windows)
+    /**
+     * Окна отбора. Шаг — опция заказа (0,5 или 1,0 м), поэтому считаем по обоим:
+     * не помещается при 1,0 м, но помещается при 0,5 м — это не ошибка, а требование
+     * к шагу, которое надо вынести в спецификацию.
+     */
+    const pitchWide = Math.max(...s.tapPitchM);
+    const pitchDense = Math.min(...s.tapPitchM);
+    const windowsAt = (p: number) => Math.floor(input.routeLenM / p);
+    if (input.taps.length > windowsAt(pitchDense))
       checks.push({
         level: "error",
-        text: `${input.taps.length} отводов не помещается на ${input.routeLenM} м при шаге ${pitch} м (${windows} окон)`,
+        text: `${input.taps.length} отводов не помещается на ${input.routeLenM} м даже при шаге ${pitchDense} м (${windowsAt(pitchDense)} окон)`,
+        fix: "удлинить трассу или разнести отводы на две ветки",
+      });
+    else if (input.taps.length > windowsAt(pitchWide))
+      checks.push({
+        level: "info",
+        text: `${input.taps.length} отводов на ${input.routeLenM} м требуют шага окон ${pitchDense} м (при ${pitchWide} м — ${windowsAt(pitchWide)} окон)`,
+        fix: `указать в спецификации шаг ответвлений ${pitchDense} м`,
       });
   }
+
+  // --- запас по току ---
+  const reservePct = ratedA != null ? round(((ratedA - loadA) / loadA) * 100) : 0;
+  if (ratedA != null && reservePct < RESERVE_MIN_PCT)
+    checks.push({
+      level: "warn",
+      text: `Запас по току ${reservePct} % — ниже проектной нормы ${RESERVE_MIN_PCT}–35 %`,
+      fix: `взять следующий номинал ряда, если рост нагрузки на объекте возможен`,
+    });
+
+  /**
+   * Потеря напряжения. ΔU = √3·I·L·(R·cosφ + X·sinφ), предел 5 % по ПУЭ 1.2.21;
+   * при нагрузке, распределённой по длине, для конца трассы ΔU допустимо делить на 2.
+   * Считать нечем: R и X (Ом/км) по номиналам КЛМ не переданы (ТЗ, открытый вопрос 3).
+   * Молча пропустить проверку нельзя — на длинной трассе она и решает выбор номинала.
+   */
+  if (routeLenNeedsDropCheck(input.routeLenM))
+    checks.push({
+      level: "info",
+      text: `Трасса ${input.routeLenM} м — потерю напряжения нужно проверить отдельно (предел 5 % по ПУЭ 1.2.21)`,
+      fix: "в справочнике КЛМ нет R и X по номиналам — расчёт ΔU подключается вместе с ними",
+    });
 
   // --- подсказки по компоновке ---
   if (s.duty === "distribution" && requiredA > 1600)
@@ -222,7 +311,7 @@ export function selectBusbar(input: Input): Result {
     ratedA,
     material,
     ip,
-    reservePct: ratedA != null ? round(((ratedA - loadA) / loadA) * 100) : 0,
+    reservePct,
     derating: k,
     sections,
     tapBoxes,
@@ -265,8 +354,8 @@ export const PRESETS: { name: string; input: Input }[] = [
     },
   },
   {
-    name: "Кран-балка 250 А",
-    input: { ...DEFAULT_INPUT, duty: "mobile", mode: "current", currentA: 250, demand: 1, env: "dusty", routeLenM: 40, taps: [] },
+    name: "Кран-балка 200 А",
+    input: { ...DEFAULT_INPUT, duty: "mobile", mode: "current", currentA: 200, env: "dusty", routeLenM: 40, taps: [] },
   },
   {
     name: "Подстанция 10 кВ",

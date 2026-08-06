@@ -14,13 +14,44 @@ test("расчёт тока по мощности и подбор минимал
   assert.equal(err(r).length, 0);
 });
 
-test("температура выше 40 °C снижает допустимый ток и поднимает номинал", () => {
+test("поправка на температуру отсчитывается от 35 °C по таблице, а не от 40 °C линейно", () => {
+  assert.equal(derating(25), 1); // повышающий коэффициент не применяется
   assert.equal(derating(35), 1);
+  assert.equal(derating(40), 0.97);
+  assert.equal(derating(45), 0.94);
   assert.equal(derating(50), 0.9);
-  const cold = run({ mode: "current", currentA: 1150, demand: 1, ambientC: 35, taps: [] });
-  const hot = run({ mode: "current", currentA: 1150, demand: 1, ambientC: 50, taps: [] });
+  assert.equal(derating(55), 0.86);
+  assert.equal(derating(42), 0.9580); // между точками — линейно
+  assert.ok(derating(70) < 0.86 && derating(70) >= 0.6); // за таблицей — экстраполяция с полом
+  const cold = run({ mode: "current", currentA: 1150, ambientC: 35, taps: [] });
+  const hot = run({ mode: "current", currentA: 1150, ambientC: 50, taps: [] });
   assert.equal(cold.ratedA, 1250);
   assert.equal(hot.ratedA, 1600);
+  assert.ok(run({ ambientC: 70, taps: [] }).checks.some((c) => c.text.includes("Таблица поправок")));
+});
+
+test("введённый расчётный ток не умножается на Kс второй раз", () => {
+  const r = run({ mode: "current", currentA: 1000, demand: 0.5, ambientC: 35, taps: [] });
+  assert.equal(r.loadA, 1000);
+  assert.equal(r.ratedA, 1000);
+  // по мощности Kс работает: 800 кВт · 0,8 → 1026 А, при Kс 1,0 → 1283 А
+  assert.equal(run({ mode: "power", powerKW: 800, demand: 1, taps: [] }).loadA, 1283);
+});
+
+test("тесный запас по току — предупреждение, а не молчание", () => {
+  const tight = run({ duty: "main", mode: "current", currentA: 1240, taps: [] });
+  assert.equal(tight.ratedA, 1250);
+  assert.ok(tight.reservePct < 15);
+  assert.ok(tight.checks.some((c) => c.level === "warn" && c.text.includes("Запас по току")));
+  const roomy = run({ duty: "main", mode: "current", currentA: 640, taps: [] }); // 640 → 800 А, запас 25 %
+  assert.ok(!roomy.checks.some((c) => c.text.includes("Запас по току")));
+});
+
+test("на длинной трассе потеря напряжения помечена как непосчитанная", () => {
+  const long = run({ duty: "main", powerKW: 800, routeLenM: 120, taps: [] });
+  assert.ok(long.checks.some((c) => c.level === "info" && c.text.includes("потерю напряжения")));
+  const short = run({ duty: "main", powerKW: 800, routeLenM: 20, taps: [] });
+  assert.ok(!short.checks.some((c) => c.text.includes("потерю напряжения")));
 });
 
 test("номиналы ШМА до 2000 А — только медь", () => {
@@ -56,6 +87,12 @@ test("сумма отводов не может превысить номина�
 test("отводов больше, чем окон на длине трассы — ошибка", () => {
   const r = run({ duty: "distribution", mode: "current", currentA: 630, demand: 1, routeLenM: 1, taps: [16, 16, 32] });
   assert.ok(err(r).some((c) => c.text.includes("не помещается")));
+});
+
+test("если отводы влезают только при плотном шаге окон — это требование, а не ошибка", () => {
+  const r = run({ duty: "distribution", mode: "current", currentA: 630, demand: 1, routeLenM: 3, taps: [16, 16, 32, 32] });
+  assert.equal(err(r).length, 0);
+  assert.ok(r.checks.some((c) => c.level === "info" && c.text.includes("требуют шага окон 0.5 м")));
 });
 
 test("магистраль без окон отбора не принимает отводы", () => {

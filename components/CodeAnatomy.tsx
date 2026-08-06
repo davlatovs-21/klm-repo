@@ -16,7 +16,7 @@ export default function CodeAnatomy({ dark = false }: { dark?: boolean }) {
       }`}
     >
       <div className={`eyebrow mb-3 flex items-center justify-between ${dark ? "text-[#8fb4c0]" : "text-mute"}`}>
-        <span>Код заказа · 9 позиций</span>
+        <span>Строка заказа · {SEGMENTS.length} позиций</span>
         <span className="flex items-center gap-2 normal-case tracking-normal">
           <i className="h-2 w-2 rounded-full bg-cur shadow-[0_0_0_4px_rgba(0,174,192,0.18)]" />
           допустимо

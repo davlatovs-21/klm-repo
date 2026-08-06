@@ -24,8 +24,16 @@ export type BusbarSeries = {
   /** Номиналы, доступные только в меди (по таблицам «Материал шин») */
   copperOnly: number[];
   materials: BusMaterial[];
+  /** Число проводников: 4 = 3L+PEN, 5 = 3L+N+PE */
+  poles: number[];
   voltageV: number;
   ip: number[];
+  /**
+   * Диапазон номиналов серии, на которые встают коробки отбора мощности;
+   * null — окон отбора нет, КОМ на эту серию не ставится.
+   * Источник: строка «Совместимость» страниц /catalog/korobki-otvetvitelnye-tapp-off.
+   */
+  tapBoxCompatA: [number, number] | null;
   /** Максимальный ток отвода на одно окно, А; null — отборов по длине нет */
   tapMaxA: number | null;
   /** Шаг окон отбора, м */
@@ -45,8 +53,10 @@ export const SERIES: BusbarSeries[] = [
     currents: [160, 250, 400, 630, 800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000, 6300, 10000],
     copperOnly: [160, 250, 400, 630, 800, 1000, 1250, 1600, 2000],
     materials: ["Cu", "Al"],
+    poles: [4, 5],
     voltageV: 1000,
     ip: [54, 55, 65, 68],
+    tapBoxCompatA: null,
     tapMaxA: null,
     tapPitchM: [],
     shortCircuitKA: 150,
@@ -73,8 +83,10 @@ export const SERIES: BusbarSeries[] = [
     currents: [100, 160, 250, 400, 630, 800, 1000, 1600],
     copperOnly: [],
     materials: ["Cu", "Al"],
+    poles: [4, 5],
     voltageV: 1000,
     ip: [54, 55],
+    tapBoxCompatA: [250, 1600],
     tapMaxA: 250,
     tapPitchM: [0.5, 1],
     shortCircuitKA: 50,
@@ -98,8 +110,10 @@ export const SERIES: BusbarSeries[] = [
     currents: [100, 160, 250, 400, 630, 800],
     copperOnly: [],
     materials: ["Cu"],
+    poles: [4, 5, 7],
     voltageV: 690,
     ip: [55, 65],
+    tapBoxCompatA: null,
     tapMaxA: null,
     tapPitchM: [],
     shortCircuitKA: 25,
@@ -122,8 +136,10 @@ export const SERIES: BusbarSeries[] = [
     currents: [1000, 1600, 2000, 2500, 3200, 4000, 5000, 6300, 8000, 10000, 12500],
     copperOnly: [],
     materials: ["Cu", "Al"],
+    poles: [3, 4],
     voltageV: 35000,
     ip: [54, 65],
+    tapBoxCompatA: null,
     tapMaxA: null,
     tapPitchM: [],
     shortCircuitKA: 80,
@@ -147,6 +163,51 @@ export const seriesByDuty = (d: Duty) => SERIES.find((s) => s.duty === d)!;
 export const TAP_BOXES = [16, 32, 63, 125, 160, 250, 400, 630];
 /** Выше этого номинала отвод идёт не через окно, а через секцию отбора */
 export const TAP_WINDOW_MAX = 250;
+/** Рабочее напряжение КОМ — ниже, чем у самого шинопровода (1000 В) */
+export const TAP_BOX_VOLTAGE_V = 690;
+/** Степени защиты корпуса КОМ; IP65/IP68 в ряду тапп-офф нет */
+export const TAP_BOX_IP = [54, 55];
+/** Число полюсов КОМ: 3P / 4P / 3P+N+PE */
+export const TAP_BOX_POLES = [4, 5];
+/** Токи КОМ, для которых на сайте есть отдельная страница */
+export const TAP_BOX_PAGE = (a: number) => `/catalog/korobki-otvetvitelnye-tapp-off/tapp-off-${a}a`;
+
+export type TapBox = {
+  /** Артикул страницы каталога */
+  sku: string;
+  name: string;
+  /** Номинальный ток отвода, А */
+  ratedA: number;
+  /** Аппарат защиты, встроенный в корпус этого номинала */
+  device: string;
+  /** Короткий код аппарата для строки заказа */
+  deviceCode: string;
+  ip: number[];
+  poles: number[];
+  /** true — номинал выше окна отбора, ставится на секцию отбора */
+  viaSection: boolean;
+  page: string;
+};
+
+/**
+ * Аппарат защиты не выбирается, а следует из номинала корпуса:
+ * 16–63 А — модульный автомат C/D, 125–630 А — автомат с термомагнитным расцепителем.
+ * Источник: строка «Аппарат защиты» страниц тапп-офф.
+ */
+export const TAP_BOXES_FULL: TapBox[] = TAP_BOXES.map((a) => ({
+  sku: `TAPP-OFF-${a}A`,
+  name: `КОМ ${a} А`,
+  ratedA: a,
+  device: a <= 63 ? "Автомат C/D" : "Автомат с термомагнитным расцепителем",
+  deviceCode: a <= 63 ? "C" : "TM",
+  ip: TAP_BOX_IP,
+  poles: TAP_BOX_POLES,
+  viaSection: a > TAP_WINDOW_MAX,
+  page: TAP_BOX_PAGE(a),
+}));
+
+/** Минимальный достаточный корпус КОМ под требуемый ток отвода */
+export const boxFor = (a: number): TapBox | null => TAP_BOXES_FULL.find((b) => b.ratedA >= a) ?? null;
 
 export const IP_ENV: { key: string; label: string; ip: number; hint: string }[] = [
   { key: "dry", label: "Сухое помещение", ip: 54, hint: "ЦОД, электрощитовая, офис — пыль и брызги" },
@@ -154,9 +215,6 @@ export const IP_ENV: { key: string; label: string; ip: number; hint: string }[] 
   { key: "wash", label: "Мойка, пищевое производство", ip: 65, hint: "литой корпус, полная пылезащита" },
   { key: "outdoor", label: "Улица, агрессивная среда", ip: 68, hint: "литой шинопровод, наружная установка" },
 ];
-
-/** Токи КОМ, для которых на сайте есть отдельная страница */
-export const TAP_BOX_PAGE = (a: number) => `/catalog/korobki-otvetvitelnye-tapp-off/tapp-off-${a}a`;
 
 /** Типовые объекты и подсказка по мощности — из FAQ страниц каталога */
 export const OBJECTS: { key: string; label: string; hint: string; solution: string }[] = [

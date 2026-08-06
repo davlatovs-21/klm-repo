@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  SERIES, SERIES_KEYS, MOUNT, PROTECTION, PROTECTION_KEYS, IP_LIST, IP_TEXT, TAP_CURRENTS,
-  HANDLE_THRESHOLD, LOAD_SHARE, type Material, type Mount, type Protection,
+  SERIES, SERIES_KEYS, SERIES_HINT, BOX_IP, IP_TEXT, TAP_CURRENTS, TAP_WINDOW_MAX,
+  HANDLE_THRESHOLD, CONNECTION, INSTALL_NOTE, boxFor, fitToSeries, type Material,
 } from "@/lib/catalog";
+import { SNAPSHOT } from "@/lib/klm-catalog";
 import {
   runChecks, buildCode, codeString, encodeConfig, decodeConfig, DEFAULT_CONFIG, PRESETS, type Config,
 } from "@/lib/engine";
@@ -50,6 +51,8 @@ export default function Configurator() {
 
   const set = (patch: Partial<Config>) => setS((c) => ({ ...c, ...patch }));
   const cfg = SERIES[s.series];
+  const compat = cfg.tapBoxCompatA;
+  const box = boxFor(s.tapCurrent);
   const r = useMemo(() => runChecks(s), [s]);
   const segs = useMemo(() => buildCode(s), [s]);
   const code = codeString(s);
@@ -63,7 +66,7 @@ export default function Configurator() {
   /* история последних десяти расчётов — пишется при выходе на результат */
   const remember = (cfg: Config) => {
     const res = runChecks(cfg);
-    if (!res.ok || !res.model) return;
+    if (!res.ok || !res.box) return;
     const q = encodeConfig(cfg);
     const next = [q, ...readHistory().filter((x) => x !== q)].slice(0, 10);
     localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
@@ -226,31 +229,37 @@ export default function Configurator() {
               <h2 className="display mt-4 text-[18px]">Параметры шинопровода</h2>
               <p className="mb-3 mt-1 text-[13px] text-mute">Что уже проложено или заложено в проект</p>
 
-              <Row label="Серия" hint={cfg.desc}>
+              <Row label="Серия" hint={SERIES_HINT[s.series]}>
                 {SERIES_KEYS.map((k) => (
                   <Opt
                     key={k}
                     on={s.series === k}
-                    sub={SERIES[k].title}
-                    onClick={() => {
-                      const c = SERIES[k];
-                      set({
-                        series: k,
-                        busCurrent: c.currents.includes(s.busCurrent) ? s.busCurrent : c.currents[Math.min(2, c.currents.length - 1)],
-                        material: c.materials.includes(s.material) ? s.material : c.materials[0],
-                        mount: c.mounts.includes(s.mount) ? s.mount : c.mounts[0],
-                        poles: c.poles.includes(s.poles) ? s.poles : c.poles[0],
-                      });
-                    }}
+                    off={SERIES[k].tapBoxCompatA == null}
+                    sub={SERIES[k].title.split(" · ")[0]}
+                    onClick={() => set(fitToSeries(k, s))}
                   >
                     {SERIES[k].name}
                   </Opt>
                 ))}
               </Row>
 
-              <Row label="Ток магистрали" hint={`на отводы допустимо до ${Math.round(s.busCurrent * LOAD_SHARE)} А`}>
+              <Row
+                label="Ток магистрали"
+                hint={
+                  compat
+                    ? `КОМ встают на ${cfg.name} ${compat[0]}–${compat[1]} А; отводы суммарно до ${s.busCurrent} А`
+                    : `У ${cfg.name} окон отбора по длине нет`
+                }
+              >
                 {cfg.currents.map((c) => (
-                  <Opt key={c} on={s.busCurrent === c} onClick={() => set({ busCurrent: c })}>{c} А</Opt>
+                  <Opt
+                    key={c}
+                    on={s.busCurrent === c}
+                    off={compat != null && (c < compat[0] || c > compat[1])}
+                    onClick={() => set({ busCurrent: c })}
+                  >
+                    {c} А
+                  </Opt>
                 ))}
               </Row>
 
@@ -270,8 +279,8 @@ export default function Configurator() {
                 ))}
               </Row>
 
-              <Row label="Степень защиты трассы">
-                {IP_LIST.map((ip) => (
+              <Row label="Степень защиты трассы" hint={`у ${cfg.name} — IP${cfg.ip.join(" / IP")}`}>
+                {cfg.ip.map((ip) => (
                   <Opt key={ip} on={s.busIP === ip} sub={IP_TEXT[ip]} onClick={() => set({ busIP: ip })}>IP{ip}</Opt>
                 ))}
               </Row>
@@ -283,33 +292,29 @@ export default function Configurator() {
               <h2 className="display mt-4 text-[18px]">Параметры отвода</h2>
               <p className="mb-3 mt-1 text-[13px] text-mute">Что нужно снять с магистрали и чем защитить</p>
 
-              <Row label="Тип установки" hint={MOUNT[s.mount].hint}>
-                {(["plug", "bolt"] as Mount[]).map((m) => (
-                  <Opt key={m} on={s.mount === m} off={!cfg.mounts.includes(m)} sub={MOUNT[m].code} onClick={() => set({ mount: m })}>
-                    {MOUNT[m].label}
-                  </Opt>
-                ))}
-              </Row>
-
-              <Row label="Ток отвода" hint={`потолок серии ${cfg.name} — ${cfg.tapMax} А`}>
+              <Row label="Ток отвода" hint={`ряд КОМ 16–630 А; в окно отбора — до ${TAP_WINDOW_MAX} А`}>
                 {TAP_CURRENTS.map((c) => (
-                  <Opt key={c} on={s.tapCurrent === c} off={c > cfg.tapMax} onClick={() => set({ tapCurrent: c })}>{c}</Opt>
-                ))}
-              </Row>
-
-              <Row label="Число отводов" hint="в одном корпусе">
-                {[1, 2, 3].map((n) => (
-                  <Opt key={n} on={s.tapCount === n} onClick={() => set({ tapCount: n })}>{n}</Opt>
-                ))}
-              </Row>
-
-              <Row label="Аппарат защиты" hint={`${PROTECTION[s.protection].label} — до ${PROTECTION[s.protection].max} А`}>
-                {PROTECTION_KEYS.map((p) => (
-                  <Opt key={p} on={s.protection === p} off={s.tapCurrent > PROTECTION[p].max} sub={`до ${PROTECTION[p].max} А`} onClick={() => set({ protection: p as Protection })}>
-                    {PROTECTION[p].label}
+                  <Opt key={c} on={s.tapCurrent === c} sub={c > TAP_WINDOW_MAX ? "секция" : undefined} onClick={() => set({ tapCurrent: c })}>
+                    {c}
                   </Opt>
                 ))}
               </Row>
+
+              <Row label="Число отводов" hint={`суммарно ${s.tapCurrent * s.tapCount} А из ${s.busCurrent} А магистрали`}>
+                {[1, 2, 3, 4].map((n) => (
+                  <Opt key={n} on={s.tapCount === n} off={s.tapCurrent * n > s.busCurrent} onClick={() => set({ tapCount: n })}>
+                    {n}
+                  </Opt>
+                ))}
+              </Row>
+
+              <div className="border-t border-line py-3">
+                <p className="text-[13px] font-semibold">Аппарат защиты и подключение</p>
+                <p className="mt-1 text-[12.5px] text-mute">
+                  {box ? `${box.name} — ${box.device.toLowerCase()}. ` : ""}
+                  {CONNECTION.toLowerCase()}. {INSTALL_NOTE}. Не выбирается: следует из номинала корпуса по каталогу КЛМ.
+                </p>
+              </div>
 
               <Row label="Рукоятка управления" hint={s.tapCurrent >= HANDLE_THRESHOLD ? `обязательна от ${HANDLE_THRESHOLD} А` : "по требованию заказчика"}>
                 {[false, true].map((h) => (
@@ -317,8 +322,8 @@ export default function Configurator() {
                 ))}
               </Row>
 
-              <Row label="Степень защиты корпуса" hint={`не ниже IP${s.busIP} трассы`}>
-                {IP_LIST.map((ip) => (
+              <Row label="Степень защиты корпуса" hint={`ряд КОМ — IP${BOX_IP.join(" / IP")}, не ниже IP${s.busIP} трассы`}>
+                {BOX_IP.map((ip) => (
                   <Opt key={ip} on={s.boxIP === ip} off={ip < s.busIP} sub={IP_TEXT[ip]} onClick={() => set({ boxIP: ip })}>IP{ip}</Opt>
                 ))}
               </Row>
@@ -335,15 +340,15 @@ export default function Configurator() {
                   <div key={c.name} className="anim-up flex items-start gap-3 border-t border-line py-2.5" style={{ animationDelay: `${i * 25}ms` }}>
                     <span
                       className={`mt-0.5 grid h-[22px] w-[22px] flex-none place-items-center rounded-lg ${
-                        c.ok ? "bg-cur-soft text-cur-d" : "bg-fault-soft text-fault"
+                        !c.ok ? "bg-fault-soft text-fault" : c.warn ? "bg-amber-100 text-amber-700" : "bg-cur-soft text-cur-d"
                       }`}
                     >
-                      {c.ok ? <IconCheck width={13} height={13} strokeWidth={2.4} /> : <IconAlert width={13} height={13} strokeWidth={2.2} />}
+                      {c.ok && !c.warn ? <IconCheck width={13} height={13} strokeWidth={2.4} /> : <IconAlert width={13} height={13} strokeWidth={2.2} />}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-[13.5px] font-semibold">{c.name}</span>
-                      <span className={`mt-0.5 block text-[12.5px] ${c.ok ? "text-mute" : "text-fault"}`}>
-                        {c.ok ? "соответствует" : c.text}
+                      <span className={`mt-0.5 block text-[12.5px] ${!c.ok ? "text-fault" : c.warn ? "text-amber-700" : "text-mute"}`}>
+                        {c.ok && !c.warn ? (c.info ?? "соответствует") : c.text}
                       </span>
                     </span>
                     {!c.ok && c.fix && (
@@ -373,20 +378,20 @@ export default function Configurator() {
             </>
           )}
 
-          {step === 3 && r.model && (
+          {step === 3 && r.box && (
             <>
               <div className="print-plain busgrid relative mt-4 overflow-hidden rounded-xl2 bg-ink p-5 text-white sm:p-6">
                 <div className="pointer-events-none absolute -right-16 -top-32 h-[340px] w-[340px] rounded-full bg-[radial-gradient(circle,rgba(0,174,192,0.42),transparent_65%)]" />
                 <div className="relative flex flex-col items-start justify-between gap-5 sm:flex-row sm:items-center sm:gap-6">
                   <div>
-                    <p className="eyebrow text-[#8fb4c0]">Рекомендованная модель</p>
-                    <p className="display mt-2 text-[clamp(24px,5vw,36px)]">{r.model.code}</p>
+                    <p className="eyebrow text-[#8fb4c0]">Коробка отбора мощности</p>
+                    <p className="display mt-2 text-[clamp(24px,5vw,36px)]">{r.box.name}</p>
                     <p className="mt-1 font-mono text-[13px] text-cur">{code}</p>
                     <p className="mt-3 text-[12.5px] text-[#8fb4c0]">
-                      {r.model.size} мм · {r.model.weight} · номинал {r.model.max} А
+                      {r.box.sku} · {r.box.device} · до 690 В AC
                     </p>
                   </div>
-                  <LoadGauge percent={Math.round((s.tapCurrent / r.model.max) * 100)} />
+                  <LoadGauge percent={Math.round((s.tapCurrent / r.box.ratedA) * 100)} />
                 </div>
               </div>
 
@@ -395,7 +400,7 @@ export default function Configurator() {
                   taps={s.tapCount}
                   tapCurrent={s.tapCurrent}
                   busCurrent={s.busCurrent}
-                  mount={s.mount}
+                  mount="bolt"
                   ok
                   className="w-full"
                 />
@@ -406,11 +411,11 @@ export default function Configurator() {
                   {[
                     ["Шинопровод", `${cfg.name} · ${s.busCurrent} А · ${s.material}`],
                     ["Проводники, IP трассы", `${s.poles} · IP${s.busIP}`],
-                    ["Установка", MOUNT[s.mount].label],
+                    ["Подключение", r.box.viaSection ? "Секция отбора" : "Окно отбора, болтовое"],
                     ["Отводы", `${s.tapCount} × ${s.tapCurrent} А = ${r.total} А`],
-                    [`Лимит магистрали (${Math.round(LOAD_SHARE * 100)} %)`, `${r.limit} А`],
-                    ["Защита, рукоятка", `${PROTECTION[s.protection].label} · ${s.handle ? "Y1" : "Y0"}`],
-                    ["Габарит, масса", `${r.model.size} · ${r.model.weight}`],
+                    ["Номинал магистрали", `${r.limit} А`],
+                    ["Защита, рукоятка", `${r.box.device} · ${s.handle ? "Y1" : "Y0"}`],
+                    ["Корпус", `${r.box.ratedA} А · IP${s.boxIP}`],
                   ].map(([k, v]) => (
                     <tr key={k}>
                       <td className="border-t border-line py-2.5 text-mute">{k}</td>
@@ -460,7 +465,7 @@ export default function Configurator() {
             </>
           )}
 
-          {step === 3 && !r.model && (
+          {step === 3 && !r.box && (
             <div className="my-4 rounded-xl2 border border-fault/30 bg-fault-soft p-6">
               <p className="display text-[18px] text-fault">Стандартной позиции под эту комбинацию нет</p>
               <p className="mt-2 text-[13.5px] text-ink-2">
@@ -476,8 +481,9 @@ export default function Configurator() {
         </div>
 
         <p className="no-print mt-5 text-[12px] leading-relaxed text-mute">
-          Прототип интерфейса. Справочник моделей, правила совместимости и грамматика кода заказа условные —
-          подставлены для демонстрации логики. Замена на реальные таблицы не затрагивает интерфейс.
+          Ряд КОМ, аппараты защиты, IP и совместимость с ШРА взяты со страниц каталога КЛМ (снимок {SNAPSHOT}).
+          Условными остаются два числа: порог обязательной рукоятки (125 А) и коэффициент одновременности отводов —
+          в расчёте принят 1,0, то есть сумма отводов сравнивается с полным номиналом магистрали.
         </p>
       </div>
 

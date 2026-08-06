@@ -144,11 +144,16 @@ export default function BusbarSelector() {
               <>
                 <Num label="Мощность нагрузки" unit="кВт" value={s.powerKW} onChange={(v) => set("powerKW", v)} step={10} />
                 <Num label="cos φ" unit="" value={s.cosPhi} onChange={(v) => set("cosPhi", v)} step={0.01} />
+                <Num label="Одновременность" unit="Kс" value={s.demand} onChange={(v) => set("demand", v)} step={0.05} />
               </>
             ) : (
-              <Num label="Расчётный ток" unit="А" value={s.currentA} onChange={(v) => set("currentA", v)} step={10} />
+              <>
+                <Num label="Расчётный ток" unit="А" value={s.currentA} onChange={(v) => set("currentA", v)} step={10} />
+                <p className="col-span-1 self-center text-[11.5px] leading-snug text-mute sm:col-span-2">
+                  Kс не применяется: расчётный ток проекта уже учитывает одновременность.
+                </p>
+              </>
             )}
-            <Num label="Одновременность" unit="Kс" value={s.demand} onChange={(v) => set("demand", v)} step={0.05} />
           </div>
 
           <Row label="Напряжение">
@@ -255,7 +260,7 @@ export default function BusbarSelector() {
             <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2.5 border-t border-white/10 pt-4 text-[12.5px]">
               {[
                 ["Расчётный ток", `${fmt(r.loadA)} А`],
-                ["С поправкой на T", `${fmt(r.requiredA)} А`],
+                [`С поправкой на T (k ${r.derating.toFixed(2)})`, `${fmt(r.requiredA)} А`],
                 ["Запас по току", r.ratedA != null ? `${r.reservePct} %` : "—"],
                 ["Материал шин", r.material],
                 ["Степень защиты", `IP${r.ip}`],

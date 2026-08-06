@@ -1,100 +1,90 @@
 /**
- * ДЕМОНСТРАЦИОННЫЙ СПРАВОЧНИК. Все значения условные.
- * В MVP заменяется на catalog.json, переданный Заказчиком по Этапу 0 (раздел 4 ТЗ).
- * Интерфейс и логика при замене не меняются — см. раздел 9.4 ТЗ.
+ * Справочник подмодуля «КОМ» (коробка отбора мощности).
+ *
+ * Серии шинопровода НЕ дублируются здесь: единственный источник — lib/klm-catalog.ts,
+ * собранный со страниц каталога КЛМ. Раньше в этом файле лежал выдуманный ряд,
+ * в котором KLM-S был «осветительным» с отводами до 100 А, а KLM-R — «распределительным»
+ * от 250 А. По данным завода всё наоборот по смыслу:
+ *   KLM-S — магистральный ШМА (сэндвич), окон отбора по длине нет, КОМ на него не ставится;
+ *   KLM-R — распределительный ШРА 100–1600 А с окнами отбора, КОМ ставятся на 250–1600 А.
  */
 
+import {
+  SERIES as BUSBARS,
+  TAP_BOXES,
+  TAP_BOXES_FULL,
+  TAP_BOX_IP,
+  TAP_BOX_POLES,
+  TAP_BOX_VOLTAGE_V,
+  TAP_WINDOW_MAX,
+  boxFor,
+  type BusMaterial,
+  type BusbarSeries,
+  type TapBox,
+} from "./klm-catalog";
+
 export type SeriesKey = "S" | "R";
-export type Mount = "plug" | "bolt";
-export type Protection = "breaker" | "fuse" | "none";
-export type Material = "Al" | "Cu";
+export type Material = BusMaterial;
+export type { TapBox, BusbarSeries };
 
-export type Series = {
-  name: string;
-  title: string;
-  desc: string;
-  currents: number[];
-  materials: Material[];
-  mounts: Mount[];
-  poles: number[];
-  tapMax: number;
+const byKey = (k: SeriesKey) => BUSBARS.find((s) => s.key === k)!;
+
+/** Серии, на которых имеет смысл подбирать КОМ. Данные — из klm-catalog. */
+export const SERIES: Record<SeriesKey, BusbarSeries> = { S: byKey("S"), R: byKey("R") };
+export const SERIES_KEYS: SeriesKey[] = ["S", "R"];
+
+/** Короткое пояснение к серии для строки выбора */
+export const SERIES_HINT: Record<SeriesKey, string> = {
+  S: "магистраль от трансформатора к ГРЩ — отборов по длине нет",
+  R: "раздача по длине трассы через окна отбора — сюда встают КОМ",
 };
 
-export const SERIES: Record<SeriesKey, Series> = {
-  S: {
-    name: "KLM-S",
-    title: "Осветительный",
-    desc: "Лёгкие трассы, освещение, розеточные группы",
-    currents: [160, 250, 400, 630],
-    materials: ["Al"],
-    mounts: ["plug"],
-    poles: [4],
-    tapMax: 100,
-  },
-  R: {
-    name: "KLM-R",
-    title: "Распределительный",
-    desc: "Основная рабочая серия для цехов и этажей",
-    currents: [250, 400, 630, 800, 1000, 1250, 1600, 2000],
-    materials: ["Al", "Cu"],
-    mounts: ["plug", "bolt"],
-    poles: [4, 5],
-    tapMax: 250,
-  },
-};
+/** Ряд токов отвода = ряд номиналов КОМ. Промежуточных значений завод не делает. */
+export const TAP_CURRENTS = TAP_BOXES;
 
-export const SERIES_KEYS = Object.keys(SERIES) as SeriesKey[];
+export { TAP_BOXES_FULL, TAP_WINDOW_MAX, TAP_BOX_VOLTAGE_V, boxFor };
 
-/** Позиция 2 кода заказа — двузначный код номинала магистрали */
-export const SIZE_CODE: Record<number, string> = {
-  160: "02", 250: "03", 400: "04", 630: "06", 800: "08",
-  1000: "10", 1250: "12", 1600: "16", 2000: "20",
-};
+/** IP корпуса КОМ — только 54 и 55 */
+export const BOX_IP = TAP_BOX_IP;
+export const BOX_POLES = TAP_BOX_POLES;
 
-export const TAP_CURRENTS = [16, 25, 32, 40, 63, 80, 100, 125, 160, 200, 250, 400];
-
-export const PROTECTION: Record<Protection, { label: string; code: string; max: number }> = {
-  breaker: { label: "Автомат", code: "B", max: 400 },
-  fuse: { label: "Предохранитель", code: "F", max: 160 },
-  none: { label: "Без защиты", code: "N", max: 63 },
-};
-export const PROTECTION_KEYS = Object.keys(PROTECTION) as Protection[];
-
-export const MOUNT: Record<Mount, { label: string; code: string; hint: string }> = {
-  plug: { label: "Plug-in", code: "P", hint: "Штепсельный · монтаж под напряжением" },
-  bolt: { label: "Bolt-on", code: "B", hint: "Болтовой · со снятием напряжения" },
-};
-
-export const IP_LIST = [54, 55, 65];
 export const IP_TEXT: Record<number, string> = {
   54: "пыль, брызги воды",
   55: "пыль, струи воды",
   65: "полная пылезащита",
+  68: "литой корпус, наружная установка",
 };
 
-/** Порог обязательного применения рукоятки управления (открытый вопрос №4 ТЗ) */
+/**
+ * Порог обязательной внешней рукоятки управления.
+ * ponytail: 125 А — граница ряда, с которой корпус комплектуется автоматом
+ * с термомагнитным расцепителем. Заглушка, ждёт подтверждения КЛМ (ТЗ, вопрос 8).
+ */
 export const HANDLE_THRESHOLD = 125;
-/** Доля тока магистрали, доступная отводам (открытый вопрос №3 ТЗ) */
-export const LOAD_SHARE = 0.4;
 
-export type Model = {
-  code: string;
-  series: SeriesKey[];
-  mount: Mount[];
-  max: number;
-  prot: Protection[];
-  ip: number[];
-  poles: number[];
-  weight: string;
-  size: string;
-};
+/** Подключение КОМ к окну отбора — единственный способ в ряду КЛМ */
+export const CONNECTION = "Болтовое соединение к окну отбора";
+export const INSTALL_NOTE =
+  "Монтаж под напряжением магистрали, при снятом напряжении бокса (ПУЭ)";
 
-export const MODELS: Model[] = [
-  { code: "КОМ-S63-P",  series: ["S"], mount: ["plug"], max: 63,  prot: ["breaker", "fuse", "none"], ip: [54, 55],     poles: [4],    weight: "3,2 кг",  size: "210×160×120" },
-  { code: "КОМ-S100-P", series: ["S"], mount: ["plug"], max: 100, prot: ["breaker", "fuse"],         ip: [54, 55],     poles: [4],    weight: "4,4 кг",  size: "260×180×130" },
-  { code: "КОМ-R63-P",  series: ["R"], mount: ["plug"], max: 63,  prot: ["breaker", "fuse", "none"], ip: [54, 55, 65], poles: [4, 5], weight: "3,6 кг",  size: "230×170×125" },
-  { code: "КОМ-R125-P", series: ["R"], mount: ["plug"], max: 125, prot: ["breaker", "fuse"],         ip: [54, 55, 65], poles: [4, 5], weight: "5,8 кг",  size: "300×200×140" },
-  { code: "КОМ-R250-P", series: ["R"], mount: ["plug"], max: 250, prot: ["breaker"],                 ip: [55, 65],     poles: [4, 5], weight: "9,4 кг",  size: "380×250×160" },
-  { code: "КОМ-R125-B", series: ["R"], mount: ["bolt"], max: 125, prot: ["breaker", "fuse"],         ip: [54, 55, 65], poles: [4, 5], weight: "5,4 кг",  size: "295×195×140" },
-  { code: "КОМ-R250-B", series: ["R"], mount: ["bolt"], max: 250, prot: ["breaker", "fuse"],         ip: [54, 55, 65], poles: [4, 5], weight: "8,7 кг",  size: "370×240×160" },
-];
+/** Артикул номинала магистрали на сайте: SHRA-630A / SHMA-1250A */
+export const busSku = (k: SeriesKey, a: number) => `${k === "R" ? "SHRA" : "SHMA"}-${a}A`;
+
+/**
+ * Приведение конфигурации к возможностям серии: ряд токов, материал, проводники, IP.
+ * Используется и при смене серии в интерфейсе, и кнопками «исправить».
+ */
+export function fitToSeries(k: SeriesKey, s: { busCurrent: number; material: Material; poles: number; busIP: number }) {
+  const c = SERIES[k];
+  const compatMin = c.tapBoxCompatA?.[0] ?? c.currents[0];
+  return {
+    series: k,
+    busCurrent: c.currents.includes(s.busCurrent)
+      ? s.busCurrent
+      : (c.currents.find((x) => x >= Math.max(s.busCurrent, compatMin)) ?? c.currents[c.currents.length - 1]),
+    material: c.materials.includes(s.material) ? s.material : c.materials[0],
+    poles: c.poles.includes(s.poles) ? s.poles : c.poles[0],
+    // ближайший достижимый IP снизу, а не первый в списке
+    busIP: c.ip.includes(s.busIP) ? s.busIP : Math.max(...c.ip.filter((x) => x < s.busIP), c.ip[0]),
+  };
+}
