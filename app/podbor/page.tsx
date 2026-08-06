@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import BusbarSelector from "@/components/BusbarSelector";
 import { PageHero, Section, Head, Card } from "@/components/ui";
-import { IMPORT_ANALOGS, SERIES, SNAPSHOT, src } from "@/lib/klm-catalog";
+import { IMPORT_ANALOGS, SERIES, SNAPSHOT, src } from "@/lib/core/klm-catalog";
 
 export const metadata: Metadata = {
   title: "Выбор шинопровода · KLM",

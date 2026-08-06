@@ -6,7 +6,7 @@ import {
   IconClock, IconCode, IconFactory, IconBus, IconTap, IconShield, IconGauge,
   IconServer, IconLayers, IconBolt,
 } from "@/components/icons";
-import { runChecks, buildCode, DEFAULT_CONFIG } from "@/lib/engine";
+import { runChecks, buildCode, DEFAULT_CONFIG } from "@/lib/core/engine";
 
 const PAIN = [
   {

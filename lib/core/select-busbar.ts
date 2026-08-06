@@ -25,6 +25,12 @@ export type Input = {
   currentA: number;
   voltageV: number;
   ambientC: number;
+  /** Способ прокладки: на ребро или плашмя (k_m, раздел 7.2) */
+  mountWay: MountWay;
+  /** Сколько параллельных трасс идёт рядом (k_g) */
+  parallelRuns: number;
+  /** Высота над уровнем моря, м (k_h) */
+  altitudeM: number;
   /** Ключ из IP_ENV */
   env: string;
   material: BusMaterial | "any";
@@ -44,6 +50,9 @@ export const DEFAULT_INPUT: Input = {
   currentA: 1600,
   voltageV: 400,
   ambientC: 35,
+  mountWay: "edge",
+  parallelRuns: 1,
+  altitudeM: 0,
   env: "dry",
   material: "any",
   fireE: 0,
@@ -57,7 +66,7 @@ export type Result = {
   series: BusbarSeries;
   /** Расчётный ток нагрузки, А */
   loadA: number;
-  /** Ток с поправкой на температуру — по нему выбирается номинал */
+  /** Ток с поправкой на условия прокладки — по нему выбирается номинал */
   requiredA: number;
   /** Подобранный номинал, А; null — за пределами ряда серии */
   ratedA: number | null;
@@ -65,7 +74,10 @@ export type Result = {
   ip: number;
   /** Запас по току относительно расчётного, % */
   reservePct: number;
+  /** Итоговая поправка k_t · k_m · k_g · k_h */
   derating: number;
+  /** Разложение поправки по факторам раздела 7.2 */
+  deratingParts: { kt: number; km: number; kg: number; kh: number };
   /** Число секций трассы по максимальной длине секции */
   sections: number;
   /** Подобранные КОМ под токи отводов */
@@ -107,6 +119,27 @@ export function derating(ambientC: number): number {
   return Math.max(0.6, Number((kl + slope * (ambientC - tl)).toFixed(4)));
 }
 
+/**
+ * Остальные поправочные коэффициенты раздела 7.2: I_required = I_load / (k_t · k_m · k_g · k_h).
+ * Значения стартовые из ТЗ, помечены как требующие подтверждения инженерной службой КЛМ.
+ * ponytail: таблицы плоские — заменяются справочником derating_curves (раздел 10.1) без правки формулы.
+ */
+export const MOUNT_FACTOR = { edge: 1, flat: 0.9 } as const;
+export type MountWay = keyof typeof MOUNT_FACTOR;
+export const MOUNT_LABEL: Record<MountWay, string> = {
+  edge: "На ребро (шины вертикально)",
+  flat: "Плашмя (шины горизонтально)",
+};
+
+/** Группировка параллельных трасс: сколько трасс идёт рядом */
+export const GROUP_FACTOR: Record<number, number> = { 1: 1, 2: 0.95, 3: 0.9 };
+/** Высота над уровнем моря, от которой вводится поправка */
+export const ALTITUDE_THRESHOLD_M = 2000;
+export const ALTITUDE_FACTOR = 0.95;
+
+export const groupFactor = (n: number) => GROUP_FACTOR[Math.min(3, Math.max(1, Math.round(n)))];
+export const altitudeFactor = (m: number) => (m > ALTITUDE_THRESHOLD_M ? ALTITUDE_FACTOR : 1);
+
 /** Запас по току, ниже которого трасса считается натянутой (ТЗ 7.12: норма 15–35 %) */
 export const RESERVE_MIN_PCT = 15;
 
@@ -140,7 +173,11 @@ export function selectBusbar(input: Input): Result {
       ? input.currentA
       : (input.powerKW * 1000 * input.demand) / (Math.sqrt(3) * u * input.cosPhi);
 
-  const k = derating(input.ambientC);
+  const kt = derating(input.ambientC);
+  const km = MOUNT_FACTOR[input.mountWay];
+  const kg = groupFactor(input.parallelRuns);
+  const kh = altitudeFactor(input.altitudeM);
+  const k = Number((kt * km * kg * kh).toFixed(4));
   const requiredA = loadA / k;
   const ratedA = nextRated(s.currents, requiredA);
 
@@ -313,6 +350,7 @@ export function selectBusbar(input: Input): Result {
     ip,
     reservePct,
     derating: k,
+    deratingParts: { kt, km, kg, kh },
     sections,
     tapBoxes,
     checks,

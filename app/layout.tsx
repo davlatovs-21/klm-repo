@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Unbounded, Manrope, JetBrains_Mono } from "next/font/google";
 import Link from "next/link";
 import MobileNav from "@/components/MobileNav";
-import { SNAPSHOT } from "@/lib/klm-catalog";
+import { SNAPSHOT } from "@/lib/core/klm-catalog";
 import "./globals.css";
 
 const SNAPSHOT_RU = new Date(SNAPSHOT).toLocaleDateString("ru-RU");

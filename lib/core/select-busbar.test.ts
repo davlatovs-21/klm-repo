@@ -30,6 +30,31 @@ test("поправка на температуру отсчитывается о
   assert.ok(run({ ambientC: 70, taps: [] }).checks.some((c) => c.text.includes("Таблица поправок")));
 });
 
+test("поправка складывается из четырёх факторов раздела 7.2, а не только из температуры", () => {
+  const r = run({
+    duty: "main", mode: "current", currentA: 1000,
+    ambientC: 45, mountWay: "flat", parallelRuns: 2, altitudeM: 2500, taps: [],
+  });
+  assert.deepEqual(r.deratingParts, { kt: 0.94, km: 0.9, kg: 0.95, kh: 0.95 });
+  assert.equal(r.derating, 0.7635); // 0,94 · 0,9 · 0,95 · 0,95
+  assert.equal(r.requiredA, 1310); // 1000 / 0,7634
+  assert.equal(r.ratedA, 1600); // без поправок хватило бы 1000 А
+});
+
+test("нормальные условия не снижают ток", () => {
+  const r = run({ duty: "main", mode: "current", currentA: 1000, taps: [] });
+  assert.equal(r.derating, 1);
+  assert.deepEqual(r.deratingParts, { kt: 1, km: 1, kg: 1, kh: 1 });
+  assert.equal(r.ratedA, 1000);
+});
+
+test("высота учитывается только выше 2000 м", () => {
+  const at = (altitudeM: number) => run({ duty: "main", mode: "current", currentA: 1000, altitudeM, taps: [] }).deratingParts.kh;
+  assert.equal(at(0), 1);
+  assert.equal(at(2000), 1);
+  assert.equal(at(2001), 0.95);
+});
+
 test("введённый расчётный ток не умножается на Kс второй раз", () => {
   const r = run({ mode: "current", currentA: 1000, demand: 0.5, ambientC: 35, taps: [] });
   assert.equal(r.loadA, 1000);

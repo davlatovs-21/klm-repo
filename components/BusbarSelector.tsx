@@ -2,8 +2,10 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { COMPANY, IP_ENV, OBJECTS, SERIES, TAP_BOXES, src, type BusMaterial } from "@/lib/klm-catalog";
-import { DEFAULT_INPUT, DUTIES, PRESETS, VOLTAGES, selectBusbar, type Input } from "@/lib/select-busbar";
+import { COMPANY, IP_ENV, OBJECTS, SERIES, TAP_BOXES, src, type BusMaterial } from "@/lib/core/klm-catalog";
+import {
+  DEFAULT_INPUT, DUTIES, MOUNT_FACTOR, MOUNT_LABEL, PRESETS, VOLTAGES, selectBusbar, type Input,
+} from "@/lib/core/select-busbar";
 import { Opt, Row } from "./ui";
 import { IconAlert, IconBolt, IconBus, IconCheck, IconLink, IconShield, IconTap } from "./icons";
 
@@ -169,6 +171,20 @@ export default function BusbarSelector() {
             <h2 className="display text-[17px]">Условия эксплуатации</h2>
           </div>
 
+          <Row label="Способ прокладки" hint={`k_m = ${r.deratingParts.km.toFixed(2)}`}>
+            {(Object.keys(MOUNT_LABEL) as (keyof typeof MOUNT_LABEL)[]).map((m) => (
+              <Opt key={m} on={s.mountWay === m} sub={`k_m ${MOUNT_FACTOR[m].toFixed(2)}`} onClick={() => set("mountWay", m)}>
+                {MOUNT_LABEL[m]}
+              </Opt>
+            ))}
+          </Row>
+
+          <div className="grid grid-cols-2 items-end gap-2 border-t border-line py-3.5 sm:grid-cols-3">
+            <Num label="Температура среды" unit="°C" value={s.ambientC} onChange={(v) => set("ambientC", v)} />
+            <Num label="Трасс рядом" unit="шт" value={s.parallelRuns} onChange={(v) => set("parallelRuns", v)} min={1} />
+            <Num label="Высота над уровнем моря" unit="м" value={s.altitudeM} onChange={(v) => set("altitudeM", v)} step={100} />
+          </div>
+
           <Row label="Среда" hint="определяет степень защиты корпуса">
             {IP_ENV.map((e) => (
               <Opt key={e.key} on={s.env === e.key} onClick={() => set("env", e.key)} sub={`IP${e.ip} · ${e.hint}`}>
@@ -199,7 +215,6 @@ export default function BusbarSelector() {
           </Row>
 
           <div className="grid grid-cols-2 items-end gap-2 border-t border-line py-3.5 sm:grid-cols-3">
-            <Num label="Температура среды" unit="°C" value={s.ambientC} onChange={(v) => set("ambientC", v)} step={5} />
             <Num label="Длина трассы" unit="м" value={s.routeLenM} onChange={(v) => set("routeLenM", v)} step={5} />
           </div>
 
@@ -260,7 +275,7 @@ export default function BusbarSelector() {
             <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2.5 border-t border-white/10 pt-4 text-[12.5px]">
               {[
                 ["Расчётный ток", `${fmt(r.loadA)} А`],
-                [`С поправкой на T (k ${r.derating.toFixed(2)})`, `${fmt(r.requiredA)} А`],
+                [`С поправкой (k ${r.derating.toFixed(3)})`, `${fmt(r.requiredA)} А`],
                 ["Запас по току", r.ratedA != null ? `${r.reservePct} %` : "—"],
                 ["Материал шин", r.material],
                 ["Степень защиты", `IP${r.ip}`],

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { buildCode, DEFAULT_CONFIG } from "@/lib/engine";
+import { buildCode, DEFAULT_CONFIG } from "@/lib/core/engine";
 
 const SEGMENTS = buildCode(DEFAULT_CONFIG);
 

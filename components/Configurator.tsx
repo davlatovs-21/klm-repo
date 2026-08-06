@@ -5,11 +5,11 @@ import { useSearchParams } from "next/navigation";
 import {
   SERIES, SERIES_KEYS, SERIES_HINT, BOX_IP, IP_TEXT, TAP_CURRENTS, TAP_WINDOW_MAX,
   HANDLE_THRESHOLD, CONNECTION, INSTALL_NOTE, boxFor, fitToSeries, type Material,
-} from "@/lib/catalog";
-import { SNAPSHOT } from "@/lib/klm-catalog";
+} from "@/lib/core/catalog";
+import { SNAPSHOT } from "@/lib/core/klm-catalog";
 import {
   runChecks, buildCode, codeString, encodeConfig, decodeConfig, DEFAULT_CONFIG, PRESETS, type Config,
-} from "@/lib/engine";
+} from "@/lib/core/engine";
 import { Opt, Row } from "./ui";
 import { BusbarScene, LoadGauge } from "./Illustrations";
 import { IconCheck, IconAlert, IconCopy, IconLink, IconPrint, IconBus, IconTap, IconShield, IconGauge } from "./icons";
