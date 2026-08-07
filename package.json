@@ -7,18 +7,27 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test lib/core/*.test.ts lib/*.test.ts"
+    "test": "tsx --test lib/core/*.test.ts lib/*.test.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "tsx --env-file=.env.local lib/db/seed.ts",
+    "test:db": "tsx --env-file=.env.local --test lib/db/*.test.ts"
   },
   "dependencies": {
+    "drizzle-orm": "^0.45.2",
     "next": "16.2.12",
+    "postgres": "^3.4.9",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.12",
     "tailwindcss": "^4",

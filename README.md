@@ -48,11 +48,28 @@
 
 ```bash
 npm install
-npm run dev     # http://localhost:3000
-npm test        # тесты расчётного модуля
-npm run build   # статическая сборка
+cp .env.example .env.local     # DATABASE_URL до локального Postgres
+createdb klm_dev
+npm run db:migrate             # применить миграции
+npm run db:seed                # тенант, организации, администратор
+npm run dev                    # http://localhost:3000
+npm test                       # ядро и приём заявок, без базы
+npm run test:db                # тесты против настоящей базы
+npm run build
 npm run lint
 ```
+
+## База данных
+
+PostgreSQL, схема — раздел 10 ТЗ, миграции Drizzle только вперёд (`drizzle/`).
+Заведены таблицы фундамента: тенанты, организации, пользователи, членство, сессии,
+приглашения, проекты, конфигурации и их версии, журнал аудита, расчётный журнал.
+Справочники, прайсы, КП и заказы появятся вместе со своими этапами — заводить их
+сейчас значило бы писать мёртвую схему.
+
+Соединение берётся только из `lib/db/index.ts`: там маркер `server-only`, ломающий
+сборку при попытке утащить строку подключения в клиентский бандл. Прямой импорт
+`lib/db/client` из `app/` и `components/` запрещён линтером.
 
 Стек: Next.js 16 (App Router, Turbopack), React 19, TypeScript, Tailwind CSS v4.
 

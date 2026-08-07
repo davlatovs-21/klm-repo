@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# образец переменных окружения нужен в репозитории
+!.env.example
 
 # vercel
 .vercel

@@ -19,6 +19,20 @@ const eslintConfig = defineConfig([
    * тестируемости, воспроизводимости расчёта и продажи ядра отдельно в white-label.
    * Проверяется штатным no-restricted-imports, без внешнего плагина.
    */
+  /**
+   * Соединение с базой берётся только из lib/db/index.ts — там маркер server-only.
+   * Прямой импорт lib/db/client в обход него утащил бы строку подключения в бандл.
+   */
+  {
+    files: ["app/**/*.{ts,tsx}", "components/**/*.{ts,tsx}", "lib/dal/**/*.ts"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        patterns: [
+          { group: ["@/lib/db/client", "**/db/client"], message: "Импортируйте db из @/lib/db — там защита server-only." },
+        ],
+      }],
+    },
+  },
   {
     files: ["lib/core/**/*.ts"],
     rules: {

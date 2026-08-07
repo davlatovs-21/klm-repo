@@ -71,6 +71,41 @@ const sweep = (now: number) => {
 
 export type LeadResult = { ok: true } | { ok: false; error: string; field?: keyof LeadInput | "consent" };
 
+/**
+ * Разбор формы заявки. Вынесен из Server Action, чтобы проверяться тестами:
+ * в самом действии остаётся только получение адреса и вызов submitLead.
+ */
+export function parseLeadForm(form: {
+  get(name: string): unknown;
+  entries(): IterableIterator<[string, unknown]>;
+}): { lead: LeadInput; honeypot: string; consent: boolean } {
+  const str = (k: string) => {
+    const v = form.get(k);
+    return typeof v === "string" ? v.slice(0, 500) : "";
+  };
+
+  const utm: Record<string, string> = {};
+  for (const [k, v] of form.entries())
+    if (k.startsWith("utm_") && typeof v === "string" && v) utm[k] = v.slice(0, 200);
+
+  return {
+    lead: {
+      name: str("name"),
+      contact: str("contact"),
+      company: str("company") || undefined,
+      objectName: str("objectName") || undefined,
+      comment: str("comment") || undefined,
+      calcQuery: str("calcQuery"),
+      calcSummary: str("calcSummary"),
+      utm,
+      dealer: str("dealer") || undefined,
+      source: str("source") === "widget" ? "widget" : "calc",
+    },
+    honeypot: str("website"),
+    consent: form.get("consent") === "on",
+  };
+}
+
 export type SubmitContext = {
   ip: string;
   /** Значение скрытого поля-ловушки: заполнено — значит бот */

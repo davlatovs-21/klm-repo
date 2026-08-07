@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { submitLead, setLeadSink, __resetLeadState, DEDUP_MS, type LeadInput, type LeadRecord } from "./leads";
+import { parseLeadForm, submitLead, setLeadSink, __resetLeadState, DEDUP_MS, type LeadInput, type LeadRecord } from "./leads";
 
 const T0 = 1_770_000_000_000; // фиксированное время: расчёт не должен зависеть от часов
 
@@ -132,4 +132,45 @@ test("заявка из виджета несёт источник и дилер
   await submitLead(lead({ source: "widget", dealer: "dealer-17" }), ctx());
   assert.equal(got[0].source, "widget");
   assert.equal(got[0].dealer, "dealer-17");
+});
+
+/* ── разбор формы ───────────────────────────────────────────────── */
+
+const formOf = (pairs: [string, string][]) => new Map(pairs) as unknown as Parameters<typeof parseLeadForm>[0];
+
+test("разбор формы собирает заявку, метки перехода, согласие и ловушку", () => {
+  const { lead: l, honeypot, consent } = parseLeadForm(
+    formOf([
+      ["name", "Иванов Пётр"], ["contact", "p@example.com"], ["company", "ПроектСтрой"],
+      ["objectName", "Цех 2"], ["comment", "срочно"], ["calcQuery", "p=1200"],
+      ["calcSummary", "KLM-S 1600 А"], ["source", "widget"], ["dealer", "d-17"],
+      ["utm_source", "yandex"], ["utm_campaign", "spring"], ["consent", "on"], ["website", ""],
+    ]),
+  );
+  assert.equal(l.name, "Иванов Пётр");
+  assert.equal(l.source, "widget");
+  assert.equal(l.dealer, "d-17");
+  assert.deepEqual(l.utm, { utm_source: "yandex", utm_campaign: "spring" });
+  assert.equal(consent, true);
+  assert.equal(honeypot, "");
+});
+
+test("разбор формы: неснятая галочка согласия и заполненная ловушка видны", () => {
+  const r = parseLeadForm(formOf([["name", "И"], ["website", "http://spam"]]));
+  assert.equal(r.consent, false);
+  assert.equal(r.honeypot, "http://spam");
+});
+
+test("разбор формы: пустые необязательные поля не превращаются в пустые строки", () => {
+  const { lead: l } = parseLeadForm(formOf([["name", "Пётр"], ["contact", "p@e.com"], ["company", ""]]));
+  assert.equal(l.company, undefined);
+  assert.equal(l.objectName, undefined);
+  assert.equal(l.dealer, undefined);
+});
+
+test("разбор формы: длинные значения обрезаются, источник по умолчанию calc", () => {
+  const { lead: l } = parseLeadForm(formOf([["name", "и".repeat(900)], ["source", "мусор"], ["utm_x", "y".repeat(500)]]));
+  assert.equal(l.name.length, 500);
+  assert.equal(l.source, "calc");
+  assert.equal(l.utm.utm_x?.length, 200);
 });
