@@ -97,7 +97,13 @@ PostgreSQL, схема — раздел 10 ТЗ, миграции Drizzle тол
 который RLS обходит. Чтобы второй рубеж заработал, в промышленной среде строка
 подключения должна использовать роль `klm_app`.
 
-Стек: Next.js 16 (App Router, Turbopack), React 19, TypeScript, Tailwind CSS v4.
+Стек: Next.js 16.3 (App Router, Turbopack), React 19.2, TypeScript, Tailwind CSS v4,
+PostgreSQL + Drizzle, argon2id.
+
+`npm audit` показывает 4 предупреждения среднего уровня в цепочке `drizzle-kit → esbuild`.
+Уязвимость касается только dev-сервера esbuild и не попадает в сборку, а предлагаемая
+npm «починка» — откат drizzle-kit до 0.18.1, то есть на мажорную версию назад.
+Оставлено сознательно; по ТЗ 12.4 сборка блокируется на критических, а не на средних.
 
 ## Данные заказчика
 
