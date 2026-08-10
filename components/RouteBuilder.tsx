@@ -1,11 +1,14 @@
 "use client";
 
-import { startTransition, useEffect, useMemo, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
 import {
   analyzeRoute, DIRECTION_LABEL, FEED_LABEL, CROSSING_LABEL, DEFAULT_LAYOUT,
   type Route, type Segment, type Direction, type FeedPoint, type CrossingKind, type TapPoint, type Crossing,
 } from "@/lib/core/route";
 import { TAP_BOXES } from "@/lib/core/klm-catalog";
+import {
+  initHistory, pushHistory, undo, redo, canUndo, canRedo, historyKey, type History,
+} from "@/lib/history";
 import RoutePlan from "./RoutePlan";
 import { Opt, Row } from "./ui";
 import { IconAlert, IconBus, IconCheck, IconTap, IconShield } from "./icons";
@@ -58,8 +61,36 @@ function Num({
 const btn = "rounded-lg border border-line bg-surface px-2 py-1 text-[12px] font-bold transition-colors hover:border-cur disabled:opacity-30";
 
 export default function RouteBuilder() {
-  const [r, setR] = useState<Route>(EMPTY);
+  const [hist, setHist] = useState<History<Route>>(() => initHistory(EMPTY));
   const [restored, setRestored] = useState(false);
+  const r = hist.present;
+
+  /**
+   * Любая правка проходит через историю. Время берётся здесь, а не внутри неё:
+   * склейка быстрых правок — правило, и оно проверяется тестами без часов.
+   */
+  const setR = useCallback((next: Route | ((p: Route) => Route)) => {
+    setHist((h) => {
+      const value = typeof next === "function" ? (next as (p: Route) => Route)(h.present) : next;
+      return pushHistory(h, value, Date.now());
+    });
+  }, []);
+
+  /** Загрузка черновика — не правка: историю она начинает, а не продолжает */
+  const resetTo = useCallback((next: Route) => setHist(initHistory(next)), []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const action = historyKey(e);
+      if (!action) return;
+      // перехватываем до браузера: иначе в числовом поле сработала бы его отмена,
+      // и текст поля разошёлся бы с состоянием трассы
+      e.preventDefault();
+      setHist((h) => (action === "undo" ? undo(h) : redo(h)));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   /* черновик переживает закрытие вкладки — ТЗ M3.8. Серверное автосохранение
      появится вместе с привязкой конфигурации к проекту. */
@@ -74,10 +105,10 @@ export default function RouteBuilder() {
     if (!draft) return;
     // восстановление не срочное: через startTransition, чтобы не вызывать каскад отрисовок
     startTransition(() => {
-      setR(draft);
+      resetTo(draft);
       setRestored(true);
     });
-  }, []);
+  }, [resetTo]);
 
   useEffect(() => {
     const id = setTimeout(() => localStorage.setItem(DRAFT_KEY, JSON.stringify(r)), 400);
@@ -126,7 +157,7 @@ export default function RouteBuilder() {
         <p className="mb-4 rounded-xl border border-line bg-surface px-3 py-2 text-[12px] text-mute">
           Восстановлен черновик из этого браузера.{" "}
           <button
-            onClick={() => { localStorage.removeItem(DRAFT_KEY); setR(EMPTY); setRestored(false); }}
+            onClick={() => { localStorage.removeItem(DRAFT_KEY); resetTo(EMPTY); setRestored(false); }}
             className="font-semibold text-cur-d underline decoration-cur/40 underline-offset-2"
           >
             Начать заново
@@ -144,10 +175,33 @@ export default function RouteBuilder() {
                 <IconBus className="h-4 w-4 text-cur-d" />
                 <h2 className="display text-[17px]">Участки трассы</h2>
               </div>
-              <button onClick={addSeg} className={btn}>+ участок</button>
+              <div className="flex items-center gap-1.5">
+                {/* кнопки, а не только сочетания клавиш: на планшете клавиатуры нет,
+                    да и о Ctrl+Z надо как-то догадаться */}
+                <button
+                  onClick={() => setHist(undo)}
+                  disabled={!canUndo(hist)}
+                  className={btn}
+                  title="Отменить (Ctrl+Z)"
+                  aria-label="Отменить последнее действие"
+                >
+                  ↶
+                </button>
+                <button
+                  onClick={() => setHist(redo)}
+                  disabled={!canRedo(hist)}
+                  className={btn}
+                  title="Повторить (Ctrl+Shift+Z)"
+                  aria-label="Повторить отменённое действие"
+                >
+                  ↷
+                </button>
+                <button onClick={addSeg} className={btn}>+ участок</button>
+              </div>
             </div>
             <p className="mb-3 mt-1 text-[12.5px] text-mute">
-              Углы подставляются сами на каждом изломе — по смене направления
+              Углы подставляются сами на каждом изломе — по смене направления.
+              Отмена — Ctrl+Z, повтор — Ctrl+Shift+Z
             </p>
 
             {/* схема — от 1024 px; на узких экранах основной способ ввода список (ТЗ 16.4) */}
