@@ -6,6 +6,7 @@ import {
   type Route, type Segment, type Direction, type FeedPoint, type CrossingKind, type TapPoint, type Crossing,
 } from "@/lib/core/route";
 import { TAP_BOXES } from "@/lib/core/klm-catalog";
+import RoutePlan from "./RoutePlan";
 import { Opt, Row } from "./ui";
 import { IconAlert, IconBus, IconCheck, IconTap, IconShield } from "./icons";
 
@@ -148,6 +149,11 @@ export default function RouteBuilder() {
             <p className="mb-3 mt-1 text-[12.5px] text-mute">
               Углы подставляются сами на каждом изломе — по смене направления
             </p>
+
+            {/* схема — от 1024 px; на узких экранах основной способ ввода список (ТЗ 16.4) */}
+            <div className="mb-4 hidden lg:block">
+              <RoutePlan route={r} onChange={setR} nextId={nextId} />
+            </div>
 
             <div className="overflow-x-auto">
               <table className="w-full min-w-[520px] border-collapse text-[13px]">

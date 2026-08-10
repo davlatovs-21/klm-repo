@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   analyzeRoute, turnBetween, splitIntoSections, DEFAULT_LAYOUT,
+  planNodes, planBounds, pointAtDistance, distanceAtPoint, snapToGrid, segmentsToPoint,
   type Route, type Segment, type ElementClass,
 } from "./route";
 
@@ -234,4 +235,109 @@ test("параметры раскладки влияют на итог — он�
   const longer = analyzeRoute(base, { ...DEFAULT_LAYOUT, sectionMaxMm: 4000 });
   assert.equal(count(standard, "Прямая секция"), 8);
   assert.equal(count(longer, "Прямая секция"), 6);
+});
+
+/* ── план для схемы ─────────────────────────────────────────────── */
+
+test("ломаная плана строится по направлениям, узлов на один больше участков", () => {
+  const nodes = planNodes([seg("x+", 30_000), seg("y+", 12_000)]);
+  assert.equal(nodes.length, 3);
+  assert.deepEqual(nodes.map((n) => [n.xMm, n.yMm]), [[0, 0], [30_000, 0], [30_000, 12_000]]);
+  assert.deepEqual(nodes.map((n) => n.atMm), [0, 30_000, 42_000]);
+});
+
+test("вертикальный участок не смещает план, но занимает расстояние вдоль трассы", () => {
+  const nodes = planNodes([seg("x+", 10_000), seg("up", 6_000), seg("x+", 10_000)]);
+  assert.deepEqual(nodes.map((n) => [n.xMm, n.yMm]), [[0, 0], [10_000, 0], [10_000, 0], [20_000, 0]]);
+  assert.deepEqual(nodes.map((n) => n.atMm), [0, 10_000, 16_000, 26_000]);
+  assert.equal(nodes[2].verticalMm, 6_000, "подъём записан со знаком");
+  assert.equal(planNodes([seg("down", 4_000)])[1].verticalMm, -4_000, "спуск отрицательный");
+});
+
+test("габариты плана охватывают все узлы, включая ход в минус", () => {
+  const b = planBounds(planNodes([seg("x-", 10_000), seg("y-", 5_000)]));
+  assert.deepEqual(b, { minX: -10_000, maxX: 0, minY: -5_000, maxY: 0 });
+});
+
+test("точка на заданном расстоянии интерполируется вдоль участка", () => {
+  const s = [seg("x+", 30_000), seg("y+", 12_000)];
+  assert.deepEqual(pointAtDistance(s, 0), { xMm: 0, yMm: 0 });
+  assert.deepEqual(pointAtDistance(s, 15_000), { xMm: 15_000, yMm: 0 });
+  assert.deepEqual(pointAtDistance(s, 30_000), { xMm: 30_000, yMm: 0 });
+  assert.deepEqual(pointAtDistance(s, 36_000), { xMm: 30_000, yMm: 6_000 });
+});
+
+test("расстояние за пределами трассы зажимается концами", () => {
+  const s = [seg("x+", 10_000)];
+  assert.deepEqual(pointAtDistance(s, -5_000), { xMm: 0, yMm: 0 });
+  assert.deepEqual(pointAtDistance(s, 99_000), { xMm: 10_000, yMm: 0 });
+});
+
+test("внутри вертикального участка план стоит на месте", () => {
+  const s = [seg("x+", 10_000), seg("up", 6_000), seg("x+", 10_000)];
+  assert.deepEqual(pointAtDistance(s, 13_000), { xMm: 10_000, yMm: 0 });
+  assert.deepEqual(pointAtDistance(s, 21_000), { xMm: 15_000, yMm: 0 });
+});
+
+test("обратная задача: точка плана переводится в расстояние вдоль трассы", () => {
+  const s = [seg("x+", 30_000), seg("y+", 12_000)];
+  assert.equal(distanceAtPoint(s, 15_000, 0), 15_000);
+  assert.equal(distanceAtPoint(s, 15_000, 2_000), 15_000, "промах в сторону проецируется на трассу");
+  assert.equal(distanceAtPoint(s, 30_000, 6_000), 36_000, "второй участок");
+});
+
+test("перетаскивание за пределы участка прижимается к его концу", () => {
+  const s = [seg("x+", 30_000)];
+  assert.equal(distanceAtPoint(s, -9_000, 0), 0);
+  assert.equal(distanceAtPoint(s, 99_000, 0), 30_000);
+});
+
+test("вертикальные участки в обратной задаче пропускаются — в плане они точка", () => {
+  const s = [seg("up", 6_000), seg("x+", 10_000)];
+  assert.equal(distanceAtPoint(s, 5_000, 0), 11_000, "расстояние отсчитано с учётом вертикали");
+});
+
+test("прямой и обратный переводы согласованы между собой", () => {
+  const s = [seg("x+", 30_000), seg("y+", 12_000), seg("x-", 9_000)];
+  for (const d of [0, 7_500, 30_000, 36_000, 45_000, 51_000]) {
+    const p = pointAtDistance(s, d);
+    assert.ok(Math.abs(distanceAtPoint(s, p.xMm, p.yMm) - d) < 1, `расстояние ${d} мм`);
+  }
+});
+
+test("привязка к сетке округляет позицию к шагу окон отбора 0,5 м", () => {
+  assert.equal(snapToGrid(12.3), 12.5);
+  assert.equal(snapToGrid(12.2), 12);
+  assert.equal(snapToGrid(0.24), 0);
+  assert.equal(snapToGrid(7.75), 8);
+  assert.equal(snapToGrid(12.34, 1), 12);
+});
+
+test("клик по плану раскладывается в ортогональные участки, длинная сторона первой", () => {
+  assert.deepEqual(segmentsToPoint(0, 0, 10_000, 3_000), [
+    { direction: "x+", lengthMm: 10_000 },
+    { direction: "y+", lengthMm: 3_000 },
+  ]);
+  assert.deepEqual(segmentsToPoint(0, 0, 3_000, 10_000), [
+    { direction: "y+", lengthMm: 10_000 },
+    { direction: "x+", lengthMm: 3_000 },
+  ]);
+  assert.deepEqual(segmentsToPoint(0, 0, -8_000, -2_000), [
+    { direction: "x-", lengthMm: 8_000 },
+    { direction: "y-", lengthMm: 2_000 },
+  ]);
+});
+
+test("клик по одной оси даёт один участок, а рядом с концом — ни одного", () => {
+  assert.deepEqual(segmentsToPoint(0, 0, 10_000, 0), [{ direction: "x+", lengthMm: 10_000 }]);
+  assert.deepEqual(segmentsToPoint(0, 0, 200, 100), [], "мусорные отрезки короче шага сетки отбрасываются");
+});
+
+test("нарисованная кликами трасса совпадает с введённой списком", () => {
+  const drawn = segmentsToPoint(0, 0, 30_000, 12_000).map((s, i) => ({ id: `d${i}`, ...s }));
+  const typed = [seg("x+", 30_000), seg("y+", 12_000)];
+  assert.deepEqual(
+    planNodes(drawn).map((n) => [n.xMm, n.yMm]),
+    planNodes(typed).map((n) => [n.xMm, n.yMm]),
+  );
 });

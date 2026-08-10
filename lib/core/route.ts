@@ -408,3 +408,122 @@ export function analyzeRoute(route: Route, params: LayoutParams = DEFAULT_LAYOUT
 /** Позиции отводов для расчёта падения напряжения по моменту нагрузки */
 export const tapsForDrop = (route: Route) =>
   route.taps.map((t) => ({ currentA: t.currentA, positionM: t.positionM }));
+
+/* ── план трассы для схемы ────────────────────────────────────────
+   Канва рисует вид сверху. Вертикальные участки в плане не смещают
+   трассу, но занимают расстояние вдоль неё — отсюда отдельное поле atMm. */
+
+export type PlanPoint = { xMm: number; yMm: number };
+/** Узел плана: точка на виде сверху и расстояние от начала трассы */
+export type PlanNode = PlanPoint & { atMm: number; verticalMm: number };
+
+const STEP: Record<Direction, [number, number]> = {
+  "x+": [1, 0], "x-": [-1, 0], "y+": [0, 1], "y-": [0, -1], up: [0, 0], down: [0, 0],
+};
+
+/**
+ * Ломаная трассы в плане. Узлов на один больше, чем участков:
+ * начало плюс конец каждого участка.
+ */
+export function planNodes(segments: Segment[]): PlanNode[] {
+  const nodes: PlanNode[] = [{ xMm: 0, yMm: 0, atMm: 0, verticalMm: 0 }];
+  let x = 0, y = 0, at = 0;
+
+  for (const s of segments) {
+    const [dx, dy] = STEP[s.direction];
+    const len = Math.max(0, s.lengthMm);
+    x += dx * len;
+    y += dy * len;
+    at += len;
+    const vertical = isVertical(s.direction) ? (s.direction === "up" ? len : -len) : 0;
+    nodes.push({ xMm: x, yMm: y, atMm: at, verticalMm: vertical });
+  }
+  return nodes;
+}
+
+/** Габариты плана — для подгонки области просмотра */
+export function planBounds(nodes: PlanNode[]) {
+  const xs = nodes.map((n) => n.xMm);
+  const ys = nodes.map((n) => n.yMm);
+  return {
+    minX: Math.min(...xs), maxX: Math.max(...xs),
+    minY: Math.min(...ys), maxY: Math.max(...ys),
+  };
+}
+
+/**
+ * Точка в плане на заданном расстоянии вдоль трассы.
+ * Внутри вертикального участка план не меняется — возвращается его узел.
+ */
+export function pointAtDistance(segments: Segment[], distMm: number): PlanPoint {
+  const nodes = planNodes(segments);
+  const total = nodes[nodes.length - 1]?.atMm ?? 0;
+  const d = Math.min(Math.max(0, distMm), total);
+
+  for (let i = 0; i < segments.length; i++) {
+    const from = nodes[i];
+    const to = nodes[i + 1];
+    if (d > to.atMm) continue;
+    if (isVertical(segments[i].direction)) return { xMm: from.xMm, yMm: from.yMm };
+    const span = to.atMm - from.atMm;
+    const k = span === 0 ? 0 : (d - from.atMm) / span;
+    return { xMm: from.xMm + (to.xMm - from.xMm) * k, yMm: from.yMm + (to.yMm - from.yMm) * k };
+  }
+  const last = nodes[nodes.length - 1];
+  return { xMm: last.xMm, yMm: last.yMm };
+}
+
+/**
+ * Обратная задача для перетаскивания: ближайшая точка трассы к произвольной
+ * точке плана и расстояние до неё вдоль трассы. Вертикальные участки
+ * пропускаются — в плане они вырождаются в точку.
+ */
+export function distanceAtPoint(segments: Segment[], xMm: number, yMm: number): number {
+  const nodes = planNodes(segments);
+  let best = 0;
+  let bestDist = Infinity;
+
+  for (let i = 0; i < segments.length; i++) {
+    if (isVertical(segments[i].direction)) continue;
+    const from = nodes[i];
+    const to = nodes[i + 1];
+    const vx = to.xMm - from.xMm;
+    const vy = to.yMm - from.yMm;
+    const len2 = vx * vx + vy * vy;
+    if (len2 === 0) continue;
+
+    // проекция точки на отрезок, зажатая его концами
+    const k = Math.min(1, Math.max(0, ((xMm - from.xMm) * vx + (yMm - from.yMm) * vy) / len2));
+    const px = from.xMm + vx * k;
+    const py = from.yMm + vy * k;
+    const d2 = (xMm - px) ** 2 + (yMm - py) ** 2;
+    if (d2 < bestDist) {
+      bestDist = d2;
+      best = from.atMm + Math.sqrt(len2) * k;
+    }
+  }
+  return best;
+}
+
+/** Привязка к сетке окон отбора: шаг 0,5 м (ТЗ M3.2) */
+export const SNAP_M = 0.5;
+export const snapToGrid = (positionM: number, step = SNAP_M) =>
+  Number((Math.round(positionM / step) * step).toFixed(2));
+
+/**
+ * Разложение хода до точки в ортогональные участки — рисование трассы кликами.
+ * Сначала по оси с большим смещением, чтобы ломаная выглядела естественно.
+ * Отрезки короче шага сетки отбрасываются: клик рядом с концом трассы
+ * не должен плодить мусорные участки.
+ */
+export function segmentsToPoint(
+  fromX: number, fromY: number, toX: number, toY: number,
+  minMm = SNAP_M * 1000,
+): { direction: Direction; lengthMm: number }[] {
+  const dx = toX - fromX;
+  const dy = toY - fromY;
+  const alongX = { direction: (dx >= 0 ? "x+" : "x-") as Direction, lengthMm: Math.abs(dx) };
+  const alongY = { direction: (dy >= 0 ? "y+" : "y-") as Direction, lengthMm: Math.abs(dy) };
+  const order = Math.abs(dx) >= Math.abs(dy) ? [alongX, alongY] : [alongY, alongX];
+  return order.filter((s) => s.lengthMm >= minMm);
+}
