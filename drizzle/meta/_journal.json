@@ -15,6 +15,13 @@
       "when": 1786079656860,
       "tag": "0001_rls_and_append_only",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786079656861,
+      "tag": "0002_config_input_optional",
+      "breakpoints": true
     }
   ]
 }

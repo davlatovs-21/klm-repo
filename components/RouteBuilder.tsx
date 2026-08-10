@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   analyzeRoute, DIRECTION_LABEL, FEED_LABEL, CROSSING_LABEL, DEFAULT_LAYOUT,
   type Route, type Segment, type Direction, type FeedPoint, type CrossingKind, type TapPoint, type Crossing,
@@ -9,6 +9,8 @@ import { TAP_BOXES } from "@/lib/core/klm-catalog";
 import {
   initHistory, pushHistory, undo, redo, canUndo, canRedo, historyKey, type History,
 } from "@/lib/history";
+import { saveRoute, fetchVersions, restoreVersion } from "@/app/actions/config";
+import type { SavedVersion } from "@/lib/dal/route";
 import RoutePlan from "./RoutePlan";
 import { Opt, Row } from "./ui";
 import { IconAlert, IconBus, IconCheck, IconTap, IconShield } from "./icons";
@@ -60,9 +62,23 @@ function Num({
 
 const btn = "rounded-lg border border-line bg-surface px-2 py-1 text-[12px] font-bold transition-colors hover:border-cur disabled:opacity-30";
 
-export default function RouteBuilder() {
-  const [hist, setHist] = useState<History<Route>>(() => initHistory(EMPTY));
+/** Простой, после которого черновик уходит на сервер — ТЗ M3.8 */
+const SERVER_IDLE_MS = 3_000;
+
+type SaveState = "saved" | "dirty" | "saving" | "error";
+
+export default function RouteBuilder({
+  configurationId, initialRoute, initialVersions,
+}: {
+  configurationId: string;
+  initialRoute: Route | null;
+  initialVersions: SavedVersion[];
+}) {
+  const [hist, setHist] = useState<History<Route>>(() => initHistory(initialRoute ?? EMPTY));
   const [restored, setRestored] = useState(false);
+  const [versions, setVersions] = useState<SavedVersion[]>(initialVersions);
+  const [saveState, setSaveState] = useState<SaveState>("saved");
+  const [saveError, setSaveError] = useState<string | null>(null);
   const r = hist.present;
 
   /**
@@ -95,6 +111,9 @@ export default function RouteBuilder() {
   /* черновик переживает закрытие вкладки — ТЗ M3.8. Серверное автосохранение
      появится вместе с привязкой конфигурации к проекту. */
   useEffect(() => {
+    // сохранённое на сервере старше локального черновика по значимости:
+    // подменять его содержимым чужого браузера нельзя
+    if (initialRoute) return;
     let draft: Route | null = null;
     try {
       const saved = localStorage.getItem(DRAFT_KEY);
@@ -108,12 +127,41 @@ export default function RouteBuilder() {
       resetTo(draft);
       setRestored(true);
     });
-  }, [resetTo]);
+  }, [resetTo, initialRoute]);
 
   useEffect(() => {
     const id = setTimeout(() => localStorage.setItem(DRAFT_KEY, JSON.stringify(r)), 400);
     return () => clearTimeout(id);
   }, [r]);
+
+  /* автосохранение на сервер при простое; первая отрисовка ничего не шлёт */
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    setSaveState("dirty");
+    const id = setTimeout(async () => {
+      setSaveState("saving");
+      const res = await saveRoute(configurationId, r);
+      if (res.ok) {
+        setSaveState("saved");
+        setSaveError(null);
+        setVersions((prev) => [res.version, ...prev].slice(0, 20));
+      } else {
+        setSaveState("error");
+        setSaveError(res.error);
+      }
+    }, SERVER_IDLE_MS);
+    return () => clearTimeout(id);
+  }, [r, configurationId]);
+
+  const openVersion = async (versionId: string) => {
+    const route = await restoreVersion(configurationId, versionId);
+    if (route) resetTo(route);
+    setVersions(await fetchVersions(configurationId));
+  };
 
   const result = useMemo(() => analyzeRoute(r, DEFAULT_LAYOUT), [r]);
   const errors = result.checks.filter((c) => c.level === "error");
@@ -199,6 +247,17 @@ export default function RouteBuilder() {
                 <button onClick={addSeg} className={btn}>+ участок</button>
               </div>
             </div>
+
+            <p
+              className={`mt-1 text-[11.5px] ${saveState === "error" ? "text-fault" : "text-mute"}`}
+              role="status"
+              aria-live="polite"
+            >
+              {saveState === "saved" && (versions.length > 0 ? `Сохранено · версия ${versions[0].versionNo}` : "Изменений нет")}
+              {saveState === "dirty" && "Есть несохранённые правки"}
+              {saveState === "saving" && "Сохраняем…"}
+              {saveState === "error" && `Не сохранено: ${saveError}`}
+            </p>
             <p className="mb-3 mt-1 text-[12.5px] text-mute">
               Углы подставляются сами на каждом изломе — по смене направления.
               Отмена — Ctrl+Z, повтор — Ctrl+Shift+Z
@@ -430,6 +489,37 @@ export default function RouteBuilder() {
               ))}
             </ul>
           </div>
+
+          {/* версии */}
+          {versions.length > 0 && (
+            <details className="mt-4 rounded-xl2 border border-line bg-surface p-4">
+              <summary className="cursor-pointer list-none">
+                <span className="eyebrow text-mute">Версии · {versions.length}</span>
+              </summary>
+              <ul className="mt-3">
+                {versions.map((v, i) => (
+                  <li key={v.id} className="flex items-center justify-between gap-2 border-t border-line py-2 first:border-0">
+                    <span className="min-w-0 text-[12px] leading-snug">
+                      <span className="font-mono font-bold">№{v.versionNo}</span>
+                      {i === 0 && <span className="ml-1.5 text-cur-d">текущая</span>}
+                      <span className="ml-1.5 text-mute">
+                        {new Date(v.createdAt).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" })}
+                      </span>
+                    </span>
+                    {i > 0 && (
+                      <button onClick={() => openVersion(v.id)} className={btn}>
+                        Открыть
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 border-t border-dashed border-line-2 pt-2 text-[11px] leading-snug text-mute">
+                Открытая версия становится текущей трассой; сохранение создаст новую поверх,
+                старые никуда не деваются.
+              </p>
+            </details>
+          )}
 
           {/* трассировка */}
           <details className="mt-4 rounded-xl2 border border-line bg-surface p-4">

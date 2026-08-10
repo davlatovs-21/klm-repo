@@ -220,8 +220,12 @@ export const configVersions = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     configurationId: uuid("configuration_id").notNull().references(() => configurations.id, { onDelete: "cascade" }),
     versionNo: integer("version_no").notNull(),
-    /** Исходные данные расчёта — Input расчётного ядра */
-    inputJson: jsonb("input_json").notNull(),
+    /**
+     * Исходные данные электрического расчёта — Input расчётного ядра.
+     * Может отсутствовать: конфигурация начинается с геометрии в конструкторе,
+     * а нагрузка привязывается позже.
+     */
+    inputJson: jsonb("input_json"),
     /** Снимок результата целиком: старая конфигурация должна открываться как была */
     resultJson: jsonb("result_json"),
     routeJson: jsonb("route_json"),
