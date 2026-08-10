@@ -31,7 +31,7 @@ export default function MobileNav({ items }: { items: { href: string; label: str
         onClick={() => setOpen(true)}
         aria-label="Открыть меню"
         aria-expanded={open}
-        className="grid h-11 w-11 place-items-center rounded-xl border border-line bg-surface md:hidden"
+        className="grid h-11 w-11 place-items-center rounded-xl border border-line bg-surface lg:hidden"
       >
         <span className="flex w-5 flex-col gap-[5px]">
           <span className="h-[2px] w-full rounded-full bg-ink" />
@@ -43,7 +43,7 @@ export default function MobileNav({ items }: { items: { href: string; label: str
       {/* оверлей — порталом в body: backdrop-filter на шапке иначе становится
           containing block для position:fixed и меню обрезается по её высоте */}
       {open && createPortal(
-        <div className="busgrid fixed inset-0 z-[100] flex h-[100dvh] w-full flex-col overflow-y-auto overflow-x-hidden bg-ink text-white md:hidden">
+        <div className="busgrid fixed inset-0 z-[100] flex h-[100dvh] w-full flex-col overflow-y-auto overflow-x-hidden bg-ink text-white lg:hidden">
           {/* свечение в собственном клипающем слое: иначе растягивает область прокрутки оверлея */}
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
             <div className="absolute -right-20 -top-28 h-[320px] w-[320px] rounded-full bg-[radial-gradient(circle,rgba(0,174,192,0.35),transparent_65%)]" />
@@ -80,7 +80,7 @@ export default function MobileNav({ items }: { items: { href: string; label: str
             >
               Главная
             </Link>
-            {items.map((n, i) => (
+            {items.map((n) => (
               <Link
                 key={n.href}
                 href={n.href}
@@ -89,17 +89,16 @@ export default function MobileNav({ items }: { items: { href: string; label: str
                   pathname === n.href ? "text-cur" : "hover:text-cur"
                 }`}
               >
-                <span className="font-mono text-[12px] text-[#8fb4c0]">{String(i + 1).padStart(2, "0")}</span>
                 {n.label}
               </Link>
             ))}
 
             <Link
-              href="/demo"
+              href="/calc"
               onClick={() => setOpen(false)}
               className="mt-8 rounded-full bg-cur px-6 py-4 text-center text-[15px] font-bold text-white"
             >
-              Попробовать подбор →
+              Рассчитать трассу →
             </Link>
           </nav>
         </div>,
