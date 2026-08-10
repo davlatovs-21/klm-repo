@@ -6,6 +6,7 @@ const SNAPSHOT_RU = new Date(SNAPSHOT).toLocaleDateString("ru-RU");
 
 const NAV = [
   { href: "/calc", label: "Калькулятор" },
+  { href: "/app/route", label: "Конструктор трассы" },
   { href: "/podbor", label: "Выбор шинопровода" },
   { href: "/sravnenie", label: "Против кабеля" },
   { href: "/demo", label: "Демо" },
