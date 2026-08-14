@@ -45,3 +45,26 @@ next-env.d.ts
 
 #docs
 /docs
+
+# AI-инструменты (локальные инструкции агентов, в репозитории не нужны)
+CLAUDE.md
+AGENTS.md
+.claude/
+.cursor/
+.cursorrules
+.windsurfrules
+.github/copilot-instructions.md
+.aider*
+.continue/
+.roo/
+GEMINI.md
+
+# редакторы / IDE
+.vscode/
+.idea/
+*.swp
+
+# macOS / Windows
+.DS_Store
+Thumbs.db
+desktop.ini

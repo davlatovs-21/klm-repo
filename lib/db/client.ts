@@ -11,21 +11,47 @@ import * as schema from "./schema";
  * миграции, сид и тесты запускаются обычным Node и должны работать.
  */
 
-const url = process.env.DATABASE_URL;
-if (!url) throw new Error("DATABASE_URL не задан — скопируйте .env.example в .env.local");
-
 /** Пул переживает горячую перезагрузку: иначе на каждой правке копились бы соединения */
 const globalForDb = globalThis as unknown as { klmSql?: ReturnType<typeof postgres> };
 
-export const sql =
-  globalForDb.klmSql ??
-  postgres(url, {
+/**
+ * Соединение поднимается при первом обращении, а не при импорте модуля.
+ * Иначе `next build` падает на сборе page data: он вычисляет модули страниц,
+ * где DATABASE_URL ещё не нужен, но уже обязателен.
+ */
+function connect() {
+  if (globalForDb.klmSql) return globalForDb.klmSql;
+
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL не задан — скопируйте .env.example в .env.local");
+
+  const instance = postgres(url, {
     max: Number(process.env.DATABASE_POOL_MAX ?? 10),
     idle_timeout: 20,
     onnotice: () => {},
   });
 
-if (process.env.NODE_ENV !== "production") globalForDb.klmSql = sql;
+  globalForDb.klmSql = instance;
+  return instance;
+}
 
-export const db = drizzle(sql, { schema });
+/**
+ * Прокси, чтобы `sql` остался и тегом шаблона (sql`select ...`), и объектом
+ * с методами (.begin, .end). Цель — функция: только она допускает ловушку apply.
+ */
+export const sql = new Proxy(function () {} as unknown as ReturnType<typeof postgres>, {
+  apply: (_t, _this, args) =>
+    (connect() as unknown as (...a: unknown[]) => unknown)(...args),
+  get: (_t, prop) => Reflect.get(connect(), prop),
+  has: (_t, prop) => Reflect.has(connect(), prop),
+}) as ReturnType<typeof postgres>;
+
+let drizzleInstance: ReturnType<typeof drizzle<typeof schema>> | undefined;
+
+export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
+  get: (_t, prop) => {
+    drizzleInstance ??= drizzle(connect(), { schema });
+    return Reflect.get(drizzleInstance, prop);
+  },
+});
 export { schema };
