@@ -72,18 +72,54 @@ test("тесный запас по току — предупреждение, а
   assert.ok(!roomy.checks.some((c) => c.text.includes("Запас по току")));
 });
 
-test("на длинной трассе потеря напряжения помечена как непосчитанная", () => {
-  const long = run({ duty: "main", powerKW: 800, routeLenM: 120, taps: [] });
-  assert.ok(long.checks.some((c) => c.level === "info" && c.text.includes("потерю напряжения")));
-  const short = run({ duty: "main", powerKW: 800, routeLenM: 20, taps: [] });
-  assert.ok(!short.checks.some((c) => c.text.includes("потерю напряжения")));
+/**
+ * С появлением каталога V3 (стр. 6) у номиналов есть R и X, и ΔU считается
+ * по-настоящему. Раньше на длинной трассе выводилась отметка «проверить отдельно».
+ */
+test("потеря напряжения считается по сопротивлениям каталога", () => {
+  const r = run({ duty: "main", powerKW: 800, routeLenM: 120, material: "Al", taps: [] });
+  assert.ok(r.profile, "профиль номинала берётся из каталога");
+  assert.ok(r.drop, "ΔU посчитано, а не помечено как непосчитанное");
+  assert.ok(r.drop!.deltaU_pct > 0);
+  assert.equal(r.drop!.limitPct, 5); // ПУЭ 1.2.21
+  assert.ok(!r.checks.some((c) => c.text.includes("проверить отдельно")));
 });
 
-test("номиналы ШМА до 2000 А — только медь", () => {
+test("длинная трасса на алюминии выходит за 5 % — это ошибка, а не примечание", () => {
+  const r = run({ duty: "main", mode: "current", currentA: 1500, demand: 1, routeLenM: 300, material: "Al", taps: [] });
+  assert.ok(r.drop && !r.drop.verdict.ok);
+  assert.ok(err(r).some((c) => c.text.includes("ΔU")));
+});
+
+test("медь того же номинала даёт меньшее падение, чем алюминий", () => {
+  const base = { duty: "main" as const, mode: "current" as const, currentA: 1500, demand: 1, routeLenM: 150, taps: [] };
+  const al = run({ ...base, material: "Al" });
+  const cu = run({ ...base, material: "Cu" });
+  assert.equal(al.ratedA, cu.ratedA);
+  assert.ok(cu.drop!.deltaU_pct < al.drop!.deltaU_pct);
+});
+
+test("масса трассы берётся из каталога, а не из ориентира", () => {
+  const r = run({ duty: "main", mode: "current", currentA: 1500, demand: 1, routeLenM: 100, material: "Al", taps: [] });
+  assert.equal(r.ratedA, 1600);
+  assert.equal(r.massKg, 1940); // 19,4 кг/м × 100 м, каталог V3 стр. 7, 4P IP55
+});
+
+/**
+ * На сайте значилось, что 160–2000 А выпускаются только в меди.
+ * Каталог V3 (стр. 6–7) даёт оба материала на всём ряду 160–6300 А.
+ */
+test("алюминий доступен на всём ряду — подмены материала на медь нет", () => {
   const r = run({ duty: "main", mode: "current", currentA: 1500, demand: 1, material: "Al", taps: [] });
   assert.equal(r.ratedA, 1600);
-  assert.equal(r.material, "Cu");
-  assert.ok(r.checks.some((c) => c.level === "warn" && c.text.includes("только в меди")));
+  assert.equal(r.material, "Al");
+  assert.ok(!r.checks.some((c) => c.text.includes("только в меди")));
+});
+
+test("в ряду KLM-S есть 315 и 500 А и нет 10 000 А", () => {
+  const currents = run({ duty: "main", taps: [] }).series.currents;
+  assert.ok(currents.includes(315) && currents.includes(500));
+  assert.equal(currents[currents.length - 1], 6300);
 });
 
 test("ток выше ряда серии — ошибка, а не молчаливое усечение", () => {
@@ -120,9 +156,26 @@ test("если отводы влезают только при плотном ш
   assert.ok(r.checks.some((c) => c.level === "info" && c.text.includes("требуют шага окон 0.5 м")));
 });
 
-test("магистраль без окон отбора не принимает отводы", () => {
-  const r = run({ duty: "main", taps: [63] });
-  assert.ok(err(r).some((c) => c.text.includes("не имеет окон отбора")));
+/**
+ * Каталог V3, стр. 24: на магистраль ставятся коробки отбора — Plug-in в окно
+ * секции Pi и Bolt-on на стык. Прежнее «у магистрали окон отбора нет» снято.
+ */
+test("магистраль принимает отводы: ряд коробок начинается со 160 А", () => {
+  const r = run({ duty: "main", mode: "current", currentA: 1500, demand: 1, routeLenM: 60, taps: [63, 400] });
+  assert.ok(!err(r).some((c) => c.text.includes("не имеет окон отбора")));
+  assert.deepEqual(
+    r.tapBoxes.map((t) => [t.requestedA, t.boxA, t.viaSection]),
+    [
+      [63, 160, false],
+      [400, 400, false],
+    ],
+  );
+});
+
+test("на магистрали окно держит до 630 А, выше — секция отбора", () => {
+  const r = run({ duty: "main", mode: "current", currentA: 2400, demand: 1, routeLenM: 60, taps: [800] });
+  assert.deepEqual(r.tapBoxes.map((t) => [t.boxA, t.viaSection]), [[800, true]]);
+  assert.ok(r.checks.some((c) => c.level === "warn" && c.text.includes("больше 630 А на окно")));
 });
 
 test("6 кВ на низковольтной серии — ошибка; на ТПЛ проходит", () => {

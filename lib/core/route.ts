@@ -13,7 +13,17 @@
  * Функции чистые: ни базы, ни часов, ни интерфейса.
  */
 import { thermalExpansion, hangers, type Material, type TraceStep } from "./electrical";
-import { TAP_BOXES, TAP_WINDOW_MAX } from "./klm-catalog";
+import {
+  COMPENSATOR_MAX_RUN_M,
+  CORNER_HORIZONTAL_MM,
+  FIRE_BARRIER,
+  SECTION_STANDARD_MM,
+  TAP_BOXES_S,
+  TAP_WINDOW_MAX_S,
+  cornerVerticalMm,
+  nonStandardCode,
+} from "./klm-catalog";
+import { massPerM, profileFor } from "./klm-profile";
 
 /* ── модель ───────────────────────────────────────────────────────── */
 
@@ -91,12 +101,15 @@ export type LayoutParams = {
 };
 
 /**
- * Значения по умолчанию — ориентиры из ТЗ, а не данные КЛМ.
- * Каждое помечено в интерфейсе как неподтверждённое.
+ * Значения по умолчанию.
+ * Длины секций — из каталога V3 (стр. 8): стандарт 3000 мм, нестандарт от 500 мм.
+ * Шаг подвесов и расчётный перепад температуры каталогом не заданы и остаются
+ * ориентирами ТЗ; масса берётся из каталога по номиналу, а это значение —
+ * запасное на случай трассы без заданного номинала.
  */
 export const DEFAULT_LAYOUT: LayoutParams = {
-  sectionMinMm: 1000,
-  sectionMaxMm: 3000,
+  sectionMinMm: 500,
+  sectionMaxMm: SECTION_STANDARD_MM,
   jointToleranceMm: 15,
   deltaTC: 40,
   hangerPitchHorizontalM: 2.5,
@@ -138,6 +151,8 @@ export type RouteResult = {
   totalLengthM: number;
   horizontalLengthM: number;
   verticalLengthM: number;
+  /** Масса трассы, кг — погонная масса каталога V3 × длину */
+  massKg: number;
   elements: RouteElement[];
   /** Суммарное число позиций — для сравнения с эталонной спецификацией */
   totalItems: number;
@@ -175,15 +190,22 @@ export function turnBetween(a: Direction, b: Direction): Turn {
 }
 
 /**
- * Разбиение длины на стандартные секции: жадно от максимальной, чтобы
- * стыков было меньше (ТЗ 8.3.1). Остаток короче минимальной длины —
- * секция под заказ, она удлиняет срок изготовления.
+ * Разбиение длины на секции: жадно от стандартной 3000 мм, чтобы стыков было
+ * меньше (ТЗ 8.3.1).
+ *
+ * Каталог V3 (стр. 5 и 8) знает ровно одну стандартную длину — 3000 мм.
+ * Любой остаток — это нестандартная секция FE-S с кодом S1 (500–999 мм),
+ * S2 (1000–1999) или S3 (2000–2999): изготовление под заказ, срок больше.
+ * Короче 500 мм завод секцию не делает вовсе — это уже ошибка раскладки.
+ *
+ * Раньше «нестандартным» считался только остаток короче минимальной длины,
+ * и секция 1500 мм молча проходила как стандартная, хотя таковой не является.
  */
 export function splitIntoSections(lengthMm: number, minMm: number, maxMm: number) {
   const full = Math.floor(lengthMm / maxMm);
   const remainderMm = lengthMm - full * maxMm;
-  if (remainderMm === 0) return { full, remainderMm: 0, nonStandard: false };
-  return { full, remainderMm, nonStandard: remainderMm < minMm };
+  if (remainderMm === 0) return { full, remainderMm: 0, nonStandard: false, tooShort: false };
+  return { full, remainderMm, nonStandard: true, tooShort: remainderMm < minMm };
 }
 
 /* ── разбор трассы ────────────────────────────────────────────────── */
@@ -208,49 +230,23 @@ export function analyzeRoute(route: Route, params: LayoutParams = DEFAULT_LAYOUT
   if (route.segments.length === 0) {
     checks.push({ level: "error", text: "Трасса пустая — добавьте хотя бы один участок" });
     return {
-      totalLengthM: 0, horizontalLengthM: 0, verticalLengthM: 0,
+      totalLengthM: 0, horizontalLengthM: 0, verticalLengthM: 0, massKg: 0,
       elements: [], totalItems: 0, checks, trace,
     };
   }
 
-  /* прямые секции и стыки */
-  let sectionCount = 0;
-  let nonStandardCount = 0;
-  for (const s of route.segments) {
-    if (s.lengthMm <= 0) {
-      checks.push({ level: "error", text: `Участок с нулевой или отрицательной длиной`, fix: "задайте длину больше нуля" });
-      continue;
-    }
-    const split = splitIntoSections(s.lengthMm, params.sectionMinMm, params.sectionMaxMm);
-    if (split.full > 0) add(elements, "Прямая секция", split.full, `${params.sectionMaxMm} мм`);
-    if (split.remainderMm > 0) {
-      if (split.nonStandard) {
-        add(elements, "Прямая секция нестандартной длины", 1, `${split.remainderMm} мм`);
-        nonStandardCount++;
-      } else {
-        add(elements, "Прямая секция", 1, `${split.remainderMm} мм`);
-      }
-    }
-    sectionCount += split.full + (split.remainderMm > 0 ? 1 : 0);
-  }
+  /**
+   * Углы съедают длину прямых участков, и теперь это считается.
+   * Габариты плеч — каталог V3, стр. 9 и 10: горизонтальный угол CD одинаков
+   * на всём ряду (435 мм по каждому плечу), вертикальный CP растёт с номиналом.
+   * До каталога этих чисел не было, и раздел выдавал предупреждение
+   * «длина углов не вычтена из прямых участков» вместо числа.
+   */
+  const fallbackRatedA = Math.max(0, ...route.segments.map((s) => s.ratedA ?? 0)) || 1600;
+  // развороты сюда не попадают: они отсеиваются как ошибка ввода, а не элемент
+  const cornerList: { turn: Exclude<NonNullable<Turn>, { kind: "reversal" }> }[] = [];
+  const deductMm = new Array<number>(route.segments.length).fill(0);
 
-  trace.push({
-    what: "Разбиение на секции",
-    formula: "жадно от максимальной длины, остаток короче минимальной — под заказ",
-    substitution: `${totalLengthM} м при секции ${params.sectionMinMm}–${params.sectionMaxMm} мм`,
-    result: `${sectionCount} секций${nonStandardCount ? `, из них ${nonStandardCount} нестандартных` : ""}`,
-    norm: "ТЗ 8.3.1",
-  });
-
-  if (nonStandardCount > 0)
-    checks.push({
-      level: "warn",
-      text: `${nonStandardCount} секц. нестандартной длины — изготовление под заказ, срок больше`,
-      fix: "подогнать длины участков под кратность стандартной секции",
-    });
-
-  /* углы на изломах */
-  let corners = 0;
   for (let i = 1; i < route.segments.length; i++) {
     const t = turnBetween(route.segments[i - 1].direction, route.segments[i].direction);
     if (!t) continue;
@@ -262,17 +258,73 @@ export function analyzeRoute(route: Route, params: LayoutParams = DEFAULT_LAYOUT
       });
       continue;
     }
-    corners++;
-    if (t.kind === "horizontal") add(elements, "Угол горизонтальный", 1, t.side);
-    else add(elements, "Угол вертикальный", 1, t.side);
+    cornerList.push({ turn: t });
+    const ratedA = route.segments[i].ratedA ?? route.segments[i - 1].ratedA ?? fallbackRatedA;
+    const arm =
+      t.kind === "horizontal" ? CORNER_HORIZONTAL_MM : cornerVerticalMm(route.material, ratedA);
+    // плечо угла уходит и в предыдущий участок, и в следующий
+    deductMm[i - 1] += arm;
+    deductMm[i] += arm;
   }
 
-  if (corners > 0)
+  /* прямые секции и стыки */
+  let sectionCount = 0;
+  let nonStandardCount = 0;
+  let cornerAllowanceMm = 0;
+  for (const [i, s] of route.segments.entries()) {
+    if (s.lengthMm <= 0) {
+      checks.push({ level: "error", text: `Участок с нулевой или отрицательной длиной`, fix: "задайте длину больше нуля" });
+      continue;
+    }
+    const straightMm = s.lengthMm - deductMm[i];
+    if (straightMm <= 0) {
+      checks.push({
+        level: "error",
+        text: `Участок ${i + 1} длиной ${s.lengthMm} мм короче углов на его концах (${deductMm[i]} мм)`,
+        fix: "удлините участок, уберите излом или согласуйте нестандартный угол с КЛМ",
+      });
+      continue;
+    }
+    cornerAllowanceMm += deductMm[i];
+    const split = splitIntoSections(straightMm, params.sectionMinMm, params.sectionMaxMm);
+    if (split.full > 0) add(elements, "Прямая секция", split.full, `${params.sectionMaxMm} мм`);
+    if (split.remainderMm > 0) {
+      if (split.tooShort) {
+        checks.push({
+          level: "error",
+          text: `Остаток участка ${i + 1} — ${split.remainderMm} мм, короче минимальной секции ${params.sectionMinMm} мм`,
+          fix: "подогнать длину участка: завод не изготавливает секции короче 500 мм",
+        });
+      } else {
+        const code = nonStandardCode(split.remainderMm);
+        add(elements, "Прямая секция нестандартной длины", 1, `${split.remainderMm} мм${code ? ` (${code})` : ""}`);
+        nonStandardCount++;
+      }
+    }
+    sectionCount += split.full + (split.remainderMm > 0 ? 1 : 0);
+  }
+
+  trace.push({
+    what: "Разбиение на секции",
+    formula: "из длины участка вычитаются плечи углов, остаток жадно режется от максимальной длины",
+    substitution: `${totalLengthM} м − ${cornerAllowanceMm} мм на углы, секция ${params.sectionMinMm}–${params.sectionMaxMm} мм`,
+    result: `${sectionCount} секций${nonStandardCount ? `, из них ${nonStandardCount} нестандартных` : ""}`,
+    norm: "ТЗ 8.3.1; габариты углов — каталог KLM V3, стр. 9–10",
+  });
+
+  if (nonStandardCount > 0)
     checks.push({
       level: "warn",
-      text: `Углы занимают часть длины трассы, и она не вычтена из прямых участков`,
-      fix: "нужны габариты углов по обеим сторонам — ячейки опросного листа 04-geometriya-raskladki.csv",
+      text: `${nonStandardCount} секц. нестандартной длины — изготовление под заказ, срок больше`,
+      fix: "подогнать длины участков под кратность стандартной секции",
     });
+
+  /* углы на изломах — состав элементов; длина уже вычтена выше */
+  const corners = cornerList.length;
+  for (const { turn } of cornerList) {
+    if (turn.kind === "horizontal") add(elements, "Угол горизонтальный", 1, turn.side);
+    else add(elements, "Угол вертикальный", 1, turn.side);
+  }
 
   /* смена номинала по длине — редукция */
   let reductions = 0;
@@ -306,17 +358,35 @@ export function analyzeRoute(route: Route, params: LayoutParams = DEFAULT_LAYOUT
       });
       continue;
     }
-    const box = TAP_BOXES.find((b) => b >= t.currentA);
+    const box = TAP_BOXES_S.find((b) => b >= t.currentA);
     if (box == null) {
       checks.push({
         level: "error",
-        text: `Отвод ${t.currentA} А выше ряда КОМ (максимум ${TAP_BOXES[TAP_BOXES.length - 1]} А)`,
+        text: `Отвод ${t.currentA} А выше ряда КОМ (максимум ${TAP_BOXES_S[TAP_BOXES_S.length - 1]} А)`,
+        fix: "разнести нагрузку на два отвода или запитать кабелем от щита",
       });
       continue;
     }
     add(elements, "Коробка отбора (КОМ)", 1, `${box} А`);
-    if (t.currentA > TAP_WINDOW_MAX) add(elements, "Секция отбора", 1, `под КОМ ${box} А`);
+    /**
+     * Свыше 630 А с одного окна не снять (каталог V3, стр. 8), поэтому такой
+     * отвод идёт коробкой Bolt-on на стык секций, а не Plug-in в окно.
+     */
+    if (t.currentA > TAP_WINDOW_MAX_S) add(elements, "Секция отбора", 1, `под КОМ ${box} А`);
   }
+
+  /**
+   * Ряд коробок KLM-S начинается со 160 А (каталог V3, стр. 24). Отвод меньше
+   * этого всё равно обслуживается коробкой 160 А — инженер должен это видеть,
+   * иначе в спецификации возникает необъяснимый скачок номинала.
+   */
+  const smallTaps = route.taps.filter((t) => t.currentA > 0 && t.currentA < TAP_BOXES_S[0]).length;
+  if (smallTaps > 0)
+    checks.push({
+      level: "info",
+      text: `${smallTaps} отв. слабее ${TAP_BOXES_S[0]} А — минимальной коробки KLM-S`,
+      fix: `ставится КОМ ${TAP_BOXES_S[0]} А; мелкие отводы дешевле собрать в один щиток`,
+    });
 
   const tapSum = route.taps.reduce((a, t) => a + t.currentA, 0);
   if (route.taps.length > 0)
@@ -330,13 +400,45 @@ export function analyzeRoute(route: Route, params: LayoutParams = DEFAULT_LAYOUT
   for (const kind of ["fire", "wall", "expansion"] as CrossingKind[]) {
     const n = route.crossings.filter((c) => c.kind === kind).length;
     if (n === 0) continue;
-    if (kind === "fire") add(elements, "Противопожарная проходка", n);
+    if (kind === "fire") add(elements, "Противопожарная проходка", n, `FB, ${FIRE_BARRIER.ratingMin} мин`);
     else if (kind === "wall") add(elements, "Проходка через стену или перекрытие", n);
     else add(elements, "Дилатационная вставка", n);
   }
 
-  /* компенсаторы теплового расширения */
+  /**
+   * Комплект огнестойкой проходки — не единственная позиция на пересечении.
+   * Каталог V3, стр. 23: производитель требует отдельно включать в спецификацию
+   * материалы заделки швов, и без них комплект не даёт заявленных 180 минут.
+   */
+  const fireCrossings = route.crossings.filter((c) => c.kind === "fire").length;
+  if (fireCrossings > 0)
+    checks.push({
+      level: "warn",
+      text: `К ${fireCrossings} огнестойк. проходкам нужны материалы заделки швов`,
+      fix: `${FIRE_BARRIER.extras.join(", ").toLowerCase()}; стена или перекрытие от ${FIRE_BARRIER.minWallMm} мм, ${FIRE_BARRIER.norm}`,
+    });
+
+  /**
+   * Компенсаторы теплового расширения.
+   *
+   * Считаются по заводской норме, а не по допуску стыка: каталог V3, стр. 21 —
+   * компенсационная секция CML ставится на прямых участках не реже чем через
+   * 30 м для алюминиевого проводника и 45 м для медного. Норма перекрывает
+   * прежний расчёт из ТЗ 7.7, где предельная длина выводилась из ΔL и допуска
+   * стыка: у завода есть своя проверенная цифра, и она главнее нашей оценки.
+   *
+   * Расчёт удлинения остаётся в трассировке — инженеру нужно видеть, сколько
+   * миллиметров набегает, даже когда число секций определяет норма.
+   */
   const expansionJoints = route.crossings.filter((c) => c.kind === "expansion").length;
+  const runLimitM = COMPENSATOR_MAX_RUN_M[route.material];
+  // по каждому прямому участку отдельно: норма про прямой участок, а не про всю трассу
+  const compensators = route.segments.reduce(
+    (sum, s) => sum + Math.max(0, Math.ceil(s.lengthMm / 1000 / runLimitM) - 1),
+    0,
+  );
+  if (compensators > 0) add(elements, "Компенсатор", compensators, `CML, шаг ${runLimitM} м`);
+
   const exp = thermalExpansion({
     material: route.material,
     lengthM: totalLengthM,
@@ -344,8 +446,35 @@ export function analyzeRoute(route: Route, params: LayoutParams = DEFAULT_LAYOUT
     jointToleranceMm: params.jointToleranceMm,
     buildingJoints: expansionJoints,
   });
-  if (exp.compensators > 0) add(elements, "Компенсатор", exp.compensators);
   trace.push(...exp.trace);
+  trace.push({
+    what: "Компенсационные секции",
+    formula: "по каждому прямому участку: ceil(L / L_доп) − 1",
+    substitution: route.segments.map((s) => `${(s.lengthMm / 1000).toFixed(1)} м`).join(" + ") + ` при L_доп = ${runLimitM} м`,
+    result: `${compensators} шт`,
+    norm: `каталог KLM V3, стр. 21: ${route.material === "Al" ? "алюминий — не более 30 м" : "медь — не более 45 м"} прямого участка`,
+  });
+
+  /**
+   * Погонная масса — из каталога V3 (стр. 7) по материалу и номиналу трассы,
+   * а не из ориентира ТЗ. От неё зависит и нагрузка на подвес, и масса трассы
+   * в спецификации. Запасное значение params.weightPerMKg остаётся для трасс,
+   * где номинал ещё не задан.
+   */
+  const profile = profileFor(route.material, fallbackRatedA);
+  const weightPerMKg = profile != null ? massPerM(profile, 55, 4) : params.weightPerMKg;
+  const massKg = Number((weightPerMKg * totalLengthM).toFixed(1));
+
+  trace.push({
+    what: "Масса трассы",
+    formula: "m = m_пог · L",
+    substitution: `${weightPerMKg} кг/м · ${totalLengthM} м`,
+    result: `${massKg} кг`,
+    norm:
+      profile != null
+        ? `каталог KLM V3, стр. 7: ${route.material} ${fallbackRatedA} А, 4P IP55`
+        : "номинал не задан — взята ориентировочная масса ТЗ",
+  });
 
   /* подвесы: горизонталь и вертикаль считаются своим шагом */
   const heavyPoints = corners + route.branches + reductions;
@@ -353,14 +482,14 @@ export function analyzeRoute(route: Route, params: LayoutParams = DEFAULT_LAYOUT
     lengthM: horizontalMm / 1000,
     pitchM: params.hangerPitchHorizontalM,
     heavyPoints,
-    weightPerMKg: params.weightPerMKg,
+    weightPerMKg,
   });
   const hangVert =
     verticalMm > 0
       ? hangers({
           lengthM: verticalMm / 1000,
           pitchM: params.hangerPitchVerticalM,
-          weightPerMKg: params.weightPerMKg,
+          weightPerMKg,
         })
       : null;
 
@@ -389,8 +518,8 @@ export function analyzeRoute(route: Route, params: LayoutParams = DEFAULT_LAYOUT
 
   checks.push({
     level: "info",
-    text: "Спецификация без артикулов, весов и цен: номенклатура КЛМ не передана",
-    fix: "ячейки опросного листа 01-nomenklatura.csv и 05-prays.csv",
+    text: "Спецификация без артикулов и цен: номенклатура и прайс КЛМ не переданы",
+    fix: "ячейки опросного листа 01-nomenklatura.csv и 05-prays.csv; габариты и массы уже взяты из каталога V3",
   });
 
   const list = [...elements.values()].sort((a, b) => a.class.localeCompare(b.class, "ru"));
@@ -398,6 +527,7 @@ export function analyzeRoute(route: Route, params: LayoutParams = DEFAULT_LAYOUT
     totalLengthM,
     horizontalLengthM: Number((horizontalMm / 1000).toFixed(2)),
     verticalLengthM: Number((verticalMm / 1000).toFixed(2)),
+    massKg,
     elements: list,
     totalItems: list.reduce((a, e) => a + e.count, 0),
     checks,

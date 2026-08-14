@@ -65,18 +65,23 @@ export function runChecks(s: Config): Result {
 
   const toR = fitToSeries("R", s);
 
-  // 1. Серия. КОМ ставится только на распределительный ШРА — у ШМА окон отбора нет.
+  /**
+   * 1. Серия. По каталогу V3 коробки отбора ставятся и на магистральный KLM-S
+   * (Plug-in в окно секции Pi, Bolt-on на стык), и на распределительный KLM-R.
+   * Раньше здесь стояло «только KLM-R» — это опровергнуто каталогом стр. 24.
+   * Троллейный и ТПЛ окон отбора не имеют, для них правило по-прежнему не проходит.
+   */
   add("Серия под отводы", compat != null,
     `${cfg.name} — ${cfg.title}. ${SERIES_HINT[s.series]}`,
     toR, "Перейти на KLM-R", false,
-    "КОМ ставятся только на распределительный ШРА KLM-R");
+    "КОМ ставятся на магистральный KLM-S и распределительный KLM-R");
 
   // 2. Номинал магистрали в диапазоне совместимости КОМ (ШРА КЛМ-Р 250–1600 А)
   const inCompat = compat != null && s.busCurrent >= compat[0] && s.busCurrent <= compat[1];
   add("Совместимость с магистралью", inCompat,
     compat == null
-      ? `Диапазон совместимости КОМ задан только для ШРА`
-      : `КОМ встают на ШРА ${compat[0]}–${compat[1]} А, у вас ${s.busCurrent} А`,
+      ? `У серии ${cfg.name} окон отбора нет — диапазон совместимости КОМ не задан`
+      : `КОМ встают на ${cfg.name} ${compat[0]}–${compat[1]} А, у вас ${s.busCurrent} А`,
     compat != null ? { busCurrent: compat[0] } : toR,
     compat != null ? `Поднять до ${compat[0]} А` : "Перейти на KLM-R", false,
     compat != null ? `Номинал ${s.busCurrent} А в диапазоне ${compat[0]}–${compat[1]} А` : undefined);
@@ -101,12 +106,17 @@ export function runChecks(s: Config): Result {
     { tapCurrent: maxBox }, `Снизить до ${maxBox} А`, false,
     box ? `${s.tapCurrent} А → корпус ${box.ratedA} А, ${box.device.toLowerCase()}` : undefined);
 
-  // 6. Окно отбора: выше 250 А корпус ставится не в окно, а на секцию отбора
-  const viaSection = s.tapCurrent > TAP_WINDOW_MAX;
+  /**
+   * 6. Окно отбора. Предел берётся у серии, а не из общей константы:
+   * у KLM-S с одного окна снимается до 630 А (каталог V3, стр. 8),
+   * у ШРА KLM-R — до 250 А. Общее число врало бы на одной из серий.
+   */
+  const windowMax = cfg.tapMaxA ?? TAP_WINDOW_MAX;
+  const viaSection = s.tapCurrent > windowMax;
   add("Способ подключения", true,
-    `Отвод ${s.tapCurrent} А больше ${TAP_WINDOW_MAX} А на окно — корпус ставится на секцию отбора, не в стандартное окно`,
+    `Отвод ${s.tapCurrent} А больше ${windowMax} А на окно — корпус ставится на секцию отбора, не в стандартное окно`,
     undefined, undefined, viaSection,
-    `${CONNECTION}, шаг окон 0,5 / 1,0 м`);
+    `${CONNECTION}${cfg.tapPitchM.length > 0 ? `, шаг окон ${cfg.tapPitchM.map((p) => String(p).replace(".", ",")).join(" / ")} м` : ""}`);
 
   // 7. Нагрузка на магистраль: сумма отводов не выше номинала ШРА.
   //    Коэффициент одновременности принят 1,0 — сравниваются номиналы, а не фактические нагрузки.
@@ -221,15 +231,15 @@ export const PRESETS: { name: string; bad?: boolean; state: Config }[] = [
   { name: "Щит 63 А", state: DEFAULT_CONFIG },
   {
     name: "Станок 125 А",
-    state: { series: "R", busCurrent: 800, material: "Al", poles: 4, busIP: 55, tapCurrent: 125, tapCount: 1, handle: true, boxIP: 55 },
+    state: { series: "R", busCurrent: 630, material: "Al", poles: 4, busIP: 55, tapCurrent: 125, tapCount: 1, handle: true, boxIP: 55 },
   },
   {
     name: "Два отвода 250 А",
-    state: { series: "R", busCurrent: 1000, material: "Cu", poles: 5, busIP: 55, tapCurrent: 250, tapCount: 2, handle: true, boxIP: 55 },
+    state: { series: "R", busCurrent: 630, material: "Cu", poles: 5, busIP: 55, tapCurrent: 250, tapCount: 2, handle: true, boxIP: 55 },
   },
   {
     name: "Отвод 400 А через секцию",
-    state: { series: "R", busCurrent: 1600, material: "Cu", poles: 5, busIP: 54, tapCurrent: 400, tapCount: 1, handle: true, boxIP: 55 },
+    state: { series: "R", busCurrent: 630, material: "Cu", poles: 5, busIP: 54, tapCurrent: 400, tapCount: 1, handle: true, boxIP: 55 },
   },
   {
     name: "Конфликт",

@@ -17,7 +17,7 @@ test("типовая конфигурация проходит и подбира
 });
 
 test("разные токи отвода дают разные корпуса, а не один и тот же", () => {
-  const box = (a: number) => runChecks({ ...DEFAULT_CONFIG, busCurrent: 1600, tapCurrent: a, handle: true }).box?.ratedA;
+  const box = (a: number) => runChecks({ ...DEFAULT_CONFIG, busCurrent: 630, tapCurrent: a, handle: true }).box?.ratedA;
   assert.deepEqual([16, 32, 63, 125, 160, 250, 400, 630].map(box), [16, 32, 63, 125, 160, 250, 400, 630]);
 });
 
@@ -29,13 +29,16 @@ test("аппарат защиты следует из номинала корп�
   );
 });
 
-test("KLM-S — магистральный ШМА без окон отбора, КОМ на него не ставится", () => {
-  const r = runChecks({ ...DEFAULT_CONFIG, series: "S" });
-  assert.equal(check({ ...DEFAULT_CONFIG, series: "S" }, "Серия под отводы").ok, false);
-  assert.equal(r.box, null);
+/**
+ * Каталог V3, стр. 24: коробки отбора ставятся и на магистральный KLM-S.
+ * Прежний тест утверждал обратное — «у ШМА окон отбора нет» — и был снят
+ * вместе с этим утверждением.
+ */
+test("КОМ ставятся и на магистральный KLM-S — окна отбора у него есть", () => {
+  assert.equal(check({ ...DEFAULT_CONFIG, series: "S" }, "Серия под отводы").ok, true);
 });
 
-test("КОМ совместимы с ШРА 250–1600 А", () => {
+test("КОМ совместимы с ШРА 250–630 А", () => {
   assert.equal(check({ ...DEFAULT_CONFIG, busCurrent: 160 }, "Совместимость с магистралью").ok, false);
   assert.equal(check({ ...DEFAULT_CONFIG, busCurrent: 250 }, "Совместимость с магистралью").ok, true);
 });
@@ -49,7 +52,7 @@ test("лимит магистрали — её номинал, а не доля 
 });
 
 test("выше 250 А корпус идёт на секцию отбора — предупреждение, не запрет", () => {
-  const s: Config = { ...DEFAULT_CONFIG, busCurrent: 1600, tapCurrent: 400, handle: true };
+  const s: Config = { ...DEFAULT_CONFIG, busCurrent: 630, tapCurrent: 400, handle: true };
   const c = check(s, "Способ подключения");
   assert.equal(c.ok, true);
   assert.equal(c.warn, true);
@@ -75,7 +78,8 @@ test("исправление приводит параметр к допусти
 });
 
 test("позиция не подбирается, пока есть нарушения (пункт 6.2 ТЗ)", () => {
-  assert.equal(runChecks({ ...DEFAULT_CONFIG, series: "S" }).box, null);
+  // 125 А без рукоятки управления нарушает правило 8 — корпус не подбирается
+  assert.equal(runChecks({ ...DEFAULT_CONFIG, tapCurrent: 125, handle: false }).box, null);
 });
 
 test("ссылка на конфигурацию восстанавливает параметры (сценарий 8 ТЗ)", () => {

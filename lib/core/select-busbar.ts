@@ -4,8 +4,10 @@
  */
 
 import {
+  CATALOG,
   IP_ENV,
   TAP_BOXES,
+  TAP_BOXES_S,
   TAP_WINDOW_MAX,
   seriesByDuty,
   src,
@@ -13,7 +15,8 @@ import {
   type BusbarSeries,
   type Duty,
 } from "./klm-catalog";
-import type { TraceStep } from "./electrical";
+import { activeResistance, massPerM, profileFor, type BusProfile } from "./klm-profile";
+import { voltageDrop, type DropResult, type TraceStep } from "./electrical";
 
 export type Input = {
   duty: Duty;
@@ -83,6 +86,15 @@ export type Result = {
   sections: number;
   /** Подобранные КОМ под токи отводов */
   tapBoxes: { requestedA: number; boxA: number | null; viaSection: boolean }[];
+  /**
+   * Профиль подобранного номинала из каталога V3: сечение, R, X, габариты, масса.
+   * null — номинал вне ряда KLM-S (другая серия или ток за пределами ряда).
+   */
+  profile: BusProfile | null;
+  /** Потеря напряжения по ТЗ 7.4; null — нет профиля, считать нечем */
+  drop: DropResult | null;
+  /** Масса трассы, кг — погонная масса каталога × длину */
+  massKg: number | null;
   checks: Check[];
   /** Как получен ответ — раздел 7.12 ТЗ, печатается в расчётной записке */
   trace: TraceStep[];
@@ -269,7 +281,14 @@ export function selectBusbar(input: Input): Result {
 
   // --- среда и IP ---
   const wantIp = IP_ENV.find((e) => e.key === input.env)?.ip ?? 54;
-  const ip = s.ip.includes(wantIp) ? wantIp : Math.max(...s.ip.filter((x) => x <= wantIp), Math.min(...s.ip));
+  /**
+   * Округление только вверх. Серия даёт дискретный ряд степеней защиты
+   * (у KLM-S по каталогу V3 это 55 и 68), и подставить IP55 там, где среда
+   * требует IP65, нельзя: защита — не тот параметр, который можно занизить
+   * до ближайшего имеющегося.
+   */
+  const ladder = [...s.ip].sort((a, b) => a - b);
+  const ip = ladder.find((x) => x >= wantIp) ?? ladder[ladder.length - 1];
   if (ip < wantIp)
     checks.push({
       level: "warn",
@@ -291,9 +310,15 @@ export function selectBusbar(input: Input): Result {
   // --- отводы ---
   // предел на одно окно — из справочника серии, а не из общей константы
   const windowMax = s.tapMaxA ?? TAP_WINDOW_MAX;
+  /**
+   * Ряд коробок зависит от серии. На KLM-S по каталогу V3 коробки идут
+   * от 160 А (Plug-in до 630 А, Bolt-on до 1250 А); мелкие 16–125 А — это
+   * тапп-офф распределительного ШРА, на магистраль они не встают.
+   */
+  const boxRange = s.duty === "main" ? TAP_BOXES_S : TAP_BOXES;
   const tapBoxes = input.taps.map((requestedA) => ({
     requestedA,
-    boxA: nextRated(TAP_BOXES, requestedA),
+    boxA: nextRated(boxRange, requestedA),
     viaSection: requestedA > windowMax,
   }));
 
@@ -315,7 +340,7 @@ export function selectBusbar(input: Input): Result {
 
     for (const t of tapBoxes) {
       if (t.boxA == null)
-        checks.push({ level: "error", text: `Отвод ${t.requestedA} А выше ряда КОМ (максимум ${TAP_BOXES.at(-1)} А)` });
+        checks.push({ level: "error", text: `Отвод ${t.requestedA} А выше ряда КОМ (максимум ${boxRange.at(-1)} А)` });
       else if (t.viaSection)
         checks.push({
           level: "warn",
@@ -363,16 +388,79 @@ export function selectBusbar(input: Input): Result {
     });
 
   /**
-   * Потеря напряжения. ΔU = √3·I·L·(R·cosφ + X·sinφ), предел 5 % по ПУЭ 1.2.21;
-   * при нагрузке, распределённой по длине, для конца трассы ΔU допустимо делить на 2.
-   * Считать нечем: R и X (Ом/км) по номиналам КЛМ не переданы (ТЗ, открытый вопрос 3).
-   * Молча пропустить проверку нельзя — на длинной трассе она и решает выбор номинала.
+   * Потеря напряжения. ΔU = √3·I·L·(R·cosφ + X·sinφ), предел 5 % по ПУЭ 1.2.21.
+   *
+   * Считается по-настоящему с появлением каталога V3: R и X по номиналам — стр. 6.
+   * Раньше здесь стояла информационная отметка «проверить отдельно».
+   *
+   * Профиль есть только у KLM-S: таблица сопротивлений в каталоге дана для неё.
+   * Для ШРА, троллейного и ТПЛ отметка остаётся — там данных по-прежнему нет.
+   *
+   * Нагрузка берётся сосредоточенной на конце трассы — это верхняя оценка.
+   * Раскладка отводов по длине уменьшила бы ΔU, но их позиции на этом экране
+   * не задаются; трасса с позициями считается в конструкторе (M3).
    */
-  if (routeLenNeedsDropCheck(input.routeLenM))
+  const profile = s.duty === "main" ? profileFor(material, ratedA) : null;
+
+  let drop: DropResult | null = null;
+  if (profile != null && input.routeLenM > 0 && loadA > 0) {
+    const rWork = activeResistance(profile, input.ambientC);
+    drop = voltageDrop({
+      currentA: loadA,
+      lengthM: input.routeLenM,
+      rOhmKm: rWork,
+      xOhmKm: profile.xOhmKm,
+      cosPhi: input.cosPhi,
+      voltageV: u,
+      feed: "end",
+      /**
+       * Магистраль — это участок ТП → ГРЩ, у него норма 5 %.
+       * Распределительная трасса питает электроприёмники, там норма 4 %
+       * (СП 256.1325800.2016). Одна норма на оба случая была бы неверна.
+       */
+      role: s.duty === "main" ? "tp-vru" : "power",
+    });
+
+    trace.push({
+      what: "Сопротивления номинала из каталога",
+      substitution: `${s.name} ${ratedA} А ${material}, сечение ${profile.areaMm2} мм²`,
+      result: `R = ${rWork} Ом/км, X = ${profile.xOhmKm} Ом/км`,
+      norm: `каталог KLM ${CATALOG.edition} от ${CATALOG.date}, стр. 6; R при ${input.ambientC > 35 ? 40 : 35} °C`,
+    });
+    trace.push(...drop.trace);
+
+    if (!drop.verdict.ok)
+      checks.push({
+        level: "error",
+        text: drop.verdict.text,
+        fix: `поднять номинал, сменить материал на медь или запитать из центра трассы`,
+      });
+    else if (drop.deltaU_pct > drop.limitPct * 0.8)
+      checks.push({
+        level: "warn",
+        text: `ΔU ${drop.deltaU_pct} % — близко к пределу ${drop.limitPct} %`,
+        fix: "запас по напряжению мал: рост длины или нагрузки выведет трассу за норму",
+      });
+  } else if (routeLenNeedsDropCheck(input.routeLenM)) {
     checks.push({
       level: "info",
       text: `Трасса ${input.routeLenM} м — потерю напряжения нужно проверить отдельно (предел 5 % по ПУЭ 1.2.21)`,
-      fix: "в справочнике КЛМ нет R и X по номиналам — расчёт ΔU подключается вместе с ними",
+      fix: `R и X по номиналам есть только для KLM-S (каталог ${CATALOG.edition}); для ${s.name} их запросить у КЛМ`,
+    });
+  }
+
+  /**
+   * Масса трассы. Погонная масса — каталог V3, стр. 7, зависит от степени защиты
+   * и числа проводников. Берётся 4P как основное исполнение; 5P тяжелее.
+   */
+  const massKg = profile != null ? round(massPerM(profile, ip, 4) * input.routeLenM) : null;
+  if (profile != null && massKg != null)
+    trace.push({
+      what: "Масса трассы",
+      formula: "m = m_пог · L",
+      substitution: `${massPerM(profile, ip, 4)} кг/м · ${input.routeLenM} м`,
+      result: `${massKg} кг`,
+      norm: `каталог KLM ${CATALOG.edition}, стр. 7, исполнение 4P IP${ip}`,
     });
 
   // --- подсказки по компоновке ---
@@ -399,6 +487,9 @@ export function selectBusbar(input: Input): Result {
     deratingParts: { kt, km, kg, kh },
     sections,
     tapBoxes,
+    profile,
+    drop,
+    massKg,
     checks,
     trace,
     productPath: path,

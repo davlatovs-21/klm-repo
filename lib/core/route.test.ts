@@ -59,16 +59,32 @@ test("разворот в трассе — ошибка ввода, а не эл
 /* ── разбиение на секции ────────────────────────────────────────── */
 
 test("длина режется жадно от максимальной секции", () => {
-  assert.deepEqual(splitIntoSections(9000, 1000, 3000), { full: 3, remainderMm: 0, nonStandard: false });
-  assert.deepEqual(splitIntoSections(10_000, 1000, 3000), { full: 3, remainderMm: 1000, nonStandard: false });
-  assert.deepEqual(splitIntoSections(9500, 1000, 3000), { full: 3, remainderMm: 500, nonStandard: true });
+  assert.deepEqual(splitIntoSections(9000, 500, 3000), { full: 3, remainderMm: 0, nonStandard: false, tooShort: false });
+  // остаток любой длины нестандартен: стандартная длина у завода одна — 3000 мм
+  assert.deepEqual(splitIntoSections(10_000, 500, 3000), { full: 3, remainderMm: 1000, nonStandard: true, tooShort: false });
+  assert.deepEqual(splitIntoSections(9500, 500, 3000), { full: 3, remainderMm: 500, nonStandard: true, tooShort: false });
+  // короче 500 мм завод не делает
+  assert.deepEqual(splitIntoSections(9300, 500, 3000), { full: 3, remainderMm: 300, nonStandard: true, tooShort: true });
 });
 
-test("остаток короче минимальной длины помечается как секция под заказ", () => {
+/**
+ * Каталог V3 знает одну стандартную длину — 3000 мм. Любой остаток идёт
+ * нестандартной секцией FE-S с кодом S1/S2/S3 и удлиняет срок изготовления.
+ */
+test("остаток любой длины — нестандартная секция с каталожным кодом", () => {
   const r = analyzeRoute(route({ segments: [seg("x+", 9_500)] }));
   assert.equal(count(r, "Прямая секция нестандартной длины"), 1);
-  assert.deepEqual(detailOf(r, "Прямая секция нестандартной длины"), ["500 мм"]);
+  assert.deepEqual(detailOf(r, "Прямая секция нестандартной длины"), ["500 мм (S1)"]);
   assert.ok(r.checks.some((c) => c.level === "warn" && c.text.includes("нестандартной длины")));
+
+  // 1500 мм попадает в диапазон S2, а не проходит молча как стандартная
+  const s2 = analyzeRoute(route({ segments: [seg("x+", 10_500)] }));
+  assert.deepEqual(detailOf(s2, "Прямая секция нестандартной длины"), ["1500 мм (S2)"]);
+});
+
+test("остаток короче 500 мм — ошибка: завод такую секцию не делает", () => {
+  const r = analyzeRoute(route({ segments: [seg("x+", 9_300)] }));
+  assert.ok(errors(r).some((c) => c.text.includes("короче минимальной секции")));
 });
 
 test("кратная длина не порождает нестандартных секций", () => {
@@ -113,16 +129,30 @@ test("смена номинала по длине даёт редукцию с �
 
 test("каждый отвод получает коробку своего номинала", () => {
   const r = analyzeRoute(
-    route({ taps: [{ id: "t1", positionM: 5, currentA: 63 }, { id: "t2", positionM: 12, currentA: 100 }] }),
+    route({ taps: [{ id: "t1", positionM: 5, currentA: 300 }, { id: "t2", positionM: 12, currentA: 700 }] }),
   );
   assert.equal(count(r, "Коробка отбора (КОМ)"), 2);
-  assert.deepEqual(detailOf(r, "Коробка отбора (КОМ)").sort(), ["125 А", "63 А"]);
+  assert.deepEqual(detailOf(r, "Коробка отбора (КОМ)").sort(), ["315 А", "800 А"]);
 });
 
+/**
+ * Ряд коробок KLM-S начинается со 160 А (каталог V3, стр. 24): мелкие 16–125 А —
+ * это тапп-офф распределительного ШРА, на магистраль они не встают.
+ */
+test("отвод слабее минимальной коробки всё равно даёт КОМ 160 А, и это сказано вслух", () => {
+  const r = analyzeRoute(route({ taps: [{ id: "t1", positionM: 5, currentA: 63 }] }));
+  assert.deepEqual(detailOf(r, "Коробка отбора (КОМ)"), ["160 А"]);
+  assert.ok(r.checks.some((c) => c.level === "info" && c.text.includes("минимальной коробки")));
+});
+
+/** Каталог V3, стр. 8: с одного окна снимается до 630 А, выше — секция отбора */
 test("отвод выше окна отбора требует секции отбора", () => {
-  const r = analyzeRoute(route({ taps: [{ id: "t1", positionM: 10, currentA: 400 }] }));
-  assert.equal(count(r, "Секция отбора"), 1);
-  assert.equal(count(r, "Коробка отбора (КОМ)"), 1);
+  const under = analyzeRoute(route({ taps: [{ id: "t1", positionM: 10, currentA: 400 }] }));
+  assert.equal(count(under, "Секция отбора"), 0, "400 А снимается прямо с окна");
+
+  const over = analyzeRoute(route({ taps: [{ id: "t1", positionM: 10, currentA: 800 }] }));
+  assert.equal(count(over, "Секция отбора"), 1);
+  assert.equal(count(over, "Коробка отбора (КОМ)"), 1);
 });
 
 test("отвод за пределами трассы — ошибка, а не молчаливое усечение", () => {
@@ -132,7 +162,8 @@ test("отвод за пределами трассы — ошибка, а не 
 });
 
 test("отвод выше ряда КОМ отбраковывается", () => {
-  const r = analyzeRoute(route({ taps: [{ id: "t1", positionM: 10, currentA: 900 }] }));
+  // ряд коробок KLM-S заканчивается на 1250 А (Bolt-on), выше — отказ
+  const r = analyzeRoute(route({ taps: [{ id: "t1", positionM: 10, currentA: 1400 }] }));
   assert.ok(errors(r).some((c) => c.text.includes("выше ряда КОМ")));
 });
 
@@ -153,12 +184,25 @@ test("пересечения границ дают проходки своего
   assert.equal(count(r, "Дилатационная вставка"), 1);
 });
 
-test("компенсаторы считаются по тепловому расширению трассы", () => {
-  // Al, 120 м, ΔT 40 °C → 110,4 мм при допуске 15 мм
-  const r = analyzeRoute(route({ segments: [seg("x+", 120_000)], material: "Al" }));
-  assert.equal(count(r, "Компенсатор"), 7);
+/**
+ * Каталог V3, стр. 21: компенсационная секция ставится на прямом участке
+ * не реже 30 м для алюминия и 45 м для меди. Это заводская норма, она
+ * заменила прежний расчёт по допуску стыка.
+ */
+test("компенсаторы считаются по заводской норме длины прямого участка", () => {
+  const al = analyzeRoute(route({ segments: [seg("x+", 120_000)], material: "Al" }));
+  assert.equal(count(al, "Компенсатор"), 3); // ceil(120 / 30) − 1
+
   const cu = analyzeRoute(route({ segments: [seg("x+", 120_000)], material: "Cu" }));
-  assert.ok(count(cu, "Компенсатор") < 7, "медь расширяется меньше");
+  assert.equal(count(cu, "Компенсатор"), 2); // ceil(120 / 45) − 1
+  assert.ok(count(cu, "Компенсатор") < count(al, "Компенсатор"), "медь расширяется меньше");
+});
+
+test("участок ровно в норму компенсатора не требует", () => {
+  const r = analyzeRoute(route({ segments: [seg("x+", 30_000)], material: "Al" }));
+  assert.equal(count(r, "Компенсатор"), 0);
+  const over = analyzeRoute(route({ segments: [seg("x+", 31_000)], material: "Al" }));
+  assert.equal(count(over, "Компенсатор"), 1);
 });
 
 /* ── подвесы и стыки ────────────────────────────────────────────── */
@@ -177,11 +221,27 @@ test("комплекты соединения считаются по числу
 
 /* ── честность результата ───────────────────────────────────────── */
 
-test("вычет длины углов не делается молча — выводится предупреждение", () => {
-  const r = analyzeRoute(route({ segments: [seg("x+", 9_000), seg("y+", 9_000)] }));
-  const w = r.checks.find((c) => c.text.includes("Углы занимают часть длины"));
-  assert.ok(w, "предупреждение обязательно");
-  assert.match(w!.fix ?? "", /04-geometriya-raskladki/);
+/**
+ * Габариты углов появились в каталоге V3 (стр. 9–10), и длина плеч теперь
+ * вычитается из прямых участков. Раньше вместо числа выдавалось предупреждение
+ * «углы занимают часть длины, и она не вычтена».
+ */
+test("длина углов вычитается из прямых участков", () => {
+  const straight = analyzeRoute(route({ segments: [seg("x+", 9_000)] }));
+  assert.equal(count(straight, "Прямая секция"), 3);
+  assert.equal(count(straight, "Прямая секция нестандартной длины"), 0);
+
+  // тот же участок, но с изломом: угол CD съедает 435 мм с каждой стороны
+  const bent = analyzeRoute(route({ segments: [seg("x+", 9_000), seg("y+", 9_000)] }));
+  assert.equal(count(bent, "Угол горизонтальный"), 1);
+  // 9000 − 435 = 8565 → две целых секции и остаток 2565 мм вместо трёх целых
+  assert.deepEqual(detailOf(bent, "Прямая секция нестандартной длины"), ["2565 мм (S3)"]);
+  assert.ok(!bent.checks.some((c) => c.text.includes("не вычтена")));
+});
+
+test("участок короче плеч своих углов — ошибка, а не отрицательная длина", () => {
+  const r = analyzeRoute(route({ segments: [seg("x+", 5_000), seg("y+", 400), seg("x+", 5_000)] }));
+  assert.ok(errors(r).some((c) => c.text.includes("короче углов на его концах")));
 });
 
 test("отсутствие артикулов и цен заявлено прямо", () => {
