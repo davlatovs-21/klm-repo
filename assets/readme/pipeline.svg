@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1200" height="452" viewBox="0 0 1200 452"
+     role="img" aria-labelledby="pipeTitle pipeDesc">
+  <title id="pipeTitle">Как геометрия трассы превращается в спецификацию</title>
+  <desc id="pipeDesc">Три шага. Первый: инженер задаёт участки трассы — направление, длину, номинал, отводы и пересечения границ. Второй: расчётное ядро считает ток нагрузки, поправки на условия прокладки и падение напряжения чистыми функциями, без обращений к базе. Третий: из геометрии собирается спецификация — прямые секции, углы, коробки отбора, компенсаторы, проходки. Каждая проверка имеет один из трёх уровней: ошибка блокирует выпуск коммерческого предложения, предупреждение требует внимания инженера, подсказка не блокирует ничего.</desc>
+
+  <rect width="1200" height="452" rx="26" fill="#0b1a21"/>
+
+  <text x="64" y="60" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="27" font-weight="700" fill="#ffffff">Геометрия → расчёт → спецификация</text>
+
+  <!-- 1. вход -->
+  <g id="input">
+    <rect x="64" y="92" width="320" height="228" rx="16" fill="#0f2530" stroke="#24404c" stroke-width="1.5"/>
+    <text x="88" y="126" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+          font-size="17" letter-spacing="1.6" fill="#5fdcea">1 · УЧАСТКИ ТРАССЫ</text>
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" fill="#c9d9e0">
+      <text x="88" y="164">x+   30 000 мм</text>
+      <text x="88" y="194">y+   12 000 мм</text>
+      <text x="88" y="224">отвод  12 м · 250 А</text>
+      <text x="88" y="254">проходка  18 м</text>
+    </g>
+    <text x="88" y="294" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="18" fill="#7f97a3">Список, схема или импорт</text>
+  </g>
+
+  <path d="M398 206 L424 206 M414 196 L424 206 L414 216" fill="none" stroke="#00aec0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- 2. ядро -->
+  <g id="core">
+    <rect x="438" y="92" width="380" height="228" rx="16" fill="#0f2530" stroke="#24404c" stroke-width="1.5"/>
+    <text x="462" y="126" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+          font-size="17" letter-spacing="1.6" fill="#5fdcea">2 · РАСЧЁТНОЕ ЯДРО</text>
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" fill="#c9d9e0">
+      <text x="462" y="164">I = P·Kс / (√3·U·cosφ)</text>
+      <text x="462" y="194">k = k_t · k_m · k_g · k_h</text>
+      <text x="462" y="224">ΔU = √3·I·L·(R·cosφ + X·sinφ)</text>
+      <text x="462" y="254">Δl = α·L·ΔT</text>
+    </g>
+    <text x="462" y="294" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="18" fill="#7f97a3">Чистые функции: ни базы, ни часов</text>
+  </g>
+
+  <path d="M832 206 L858 206 M848 196 L858 206 L848 216" fill="none" stroke="#00aec0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- 3. выход -->
+  <g id="bom">
+    <rect x="872" y="92" width="264" height="228" rx="16" fill="#0f2530" stroke="#24404c" stroke-width="1.5"/>
+    <text x="896" y="126" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+          font-size="17" letter-spacing="1.6" fill="#7DC800">3 · СПЕЦИФИКАЦИЯ</text>
+    <g font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="18" fill="#c9d9e0">
+      <text x="896" y="164">Прямая секция</text>
+      <text x="1112" y="164" text-anchor="end" fill="#ffffff">×14</text>
+      <text x="896" y="194">Угол CD</text>
+      <text x="1112" y="194" text-anchor="end" fill="#ffffff">×1</text>
+      <text x="896" y="224">Коробка 250 А</text>
+      <text x="1112" y="224" text-anchor="end" fill="#ffffff">×1</text>
+      <text x="896" y="254">Компенсатор</text>
+      <text x="1112" y="254" text-anchor="end" fill="#ffffff">×1</text>
+    </g>
+    <text x="896" y="294" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="18" fill="#7f97a3">Классы раздела 8.2 ТЗ</text>
+  </g>
+
+  <!-- уровни проверок -->
+  <g id="checks">
+    <path d="M64 352 H1136" stroke="#24404c" stroke-width="1.5"/>
+    <text x="64" y="388" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="18" fill="#7f97a3">Каждое изменение пересчитывает трассу. Проверки трёх уровней:</text>
+
+    <g font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="19">
+      <circle cx="72" cy="418" r="7" fill="#e24a5e"/>
+      <text x="90" y="425" fill="#ffffff">ошибка</text>
+      <text x="168" y="425" fill="#8ba4b0">блокирует выпуск КП</text>
+
+      <circle cx="420" cy="418" r="7" fill="#e8b13a"/>
+      <text x="438" y="425" fill="#ffffff">предупреждение</text>
+      <text x="612" y="425" fill="#8ba4b0">требует внимания</text>
+
+      <circle cx="812" cy="418" r="7" fill="#00aec0"/>
+      <text x="830" y="425" fill="#ffffff">подсказка</text>
+      <text x="940" y="425" fill="#8ba4b0">не блокирует ничего</text>
+    </g>
+  </g>
+</svg>

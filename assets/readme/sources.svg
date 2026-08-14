@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1200" height="424" viewBox="0 0 1200 424"
+     role="img" aria-labelledby="srcTitle srcDesc">
+  <title id="srcTitle">Два источника данных и порядок старшинства между ними</title>
+  <desc id="srcDesc">Официальный каталог KLM редакции V3 от 24 марта 2026 года — старший источник по серии KLM-S: из него взяты ряд номиналов 160–6300 ампер, сопротивления R и X, габариты и массы, длины секций, габариты углов, нормы компенсаторов и проходок. Снимок публичного сайта от 5 августа 2026 года — младший источник: из него берутся только серии KLM-T и ТПЛ, аналоги импорта и ссылки на страницы. Оба источника сходятся в справочнике в коде. Там, где они расходятся, верен каталог, а расхождение помечается в коде меткой CATALOG-V3.</desc>
+
+  <rect width="1200" height="424" rx="26" fill="#0b1a21"/>
+
+  <text x="64" y="58" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="27" font-weight="700" fill="#ffffff">Два источника, и они не равны</text>
+
+  <!-- старший источник -->
+  <g id="catalog">
+    <rect x="64" y="86" width="520" height="152" rx="16" fill="#12261c" stroke="#7DC800" stroke-width="2"/>
+    <text x="90" y="120" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+          font-size="17" letter-spacing="1.4" fill="#7DC800">КАТАЛОГ KLM V3 · 24.03.2026</text>
+    <text x="90" y="152" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="21" font-weight="700" fill="#ffffff">Старший источник по KLM-S</text>
+    <g font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="18" fill="#a9c4b4">
+      <text x="90" y="184">ряд 160–6300 А · R и X · габариты и массы</text>
+      <text x="90" y="212">секции · углы · компенсаторы · проходки</text>
+    </g>
+  </g>
+
+  <!-- младший источник -->
+  <g id="site">
+    <rect x="616" y="86" width="520" height="152" rx="16" fill="#0f2530" stroke="#24404c" stroke-width="1.5"/>
+    <text x="642" y="120" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+          font-size="17" letter-spacing="1.4" fill="#7f97a3">СНИМОК САЙТА · 05.08.2026</text>
+    <text x="642" y="152" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="21" font-weight="700" fill="#c9d9e0">Младший источник</text>
+    <g font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="18" fill="#8ba4b0">
+      <text x="642" y="184">KLM-T и ТПЛ · аналоги импорта</text>
+      <text x="642" y="212">ссылки на страницы каталога</text>
+    </g>
+  </g>
+
+  <!-- слияние -->
+  <path d="M324 238 V266 H600" fill="none" stroke="#7DC800" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M876 238 V266 H600" fill="none" stroke="#3c5b68" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M600 266 V292 M590 282 L600 292 L610 282" fill="none" stroke="#00aec0" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <g id="registry">
+    <rect x="300" y="296" width="600" height="66" rx="14" fill="#0f2530" stroke="#00aec0" stroke-width="1.5"/>
+    <text x="600" y="326" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+          font-size="19" fill="#ffffff">lib/core/klm-catalog.ts · klm-profile.ts</text>
+    <text x="600" y="350" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="18" fill="#7f97a3">один справочник для всего расчёта</text>
+  </g>
+
+  <text x="600" y="398" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="19" fill="#8ba4b0">Где источники расходятся — верен каталог, а расхождение помечено в коде меткой <tspan fill="#7DC800" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">CATALOG-V3</tspan></text>
+</svg>
