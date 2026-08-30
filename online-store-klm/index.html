@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="KLM Менеджер в Таджикистане — управление проектами с потенциалом применения шинопровода">
+  <title>KLM Менеджер в Таджикистане</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="notifications.css">
+  <link rel="stylesheet" href="contacts.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="#landing" aria-label="KLM Менеджер в Таджикистане">
+        <span class="brand-mark">K</span><span><b>KLM Менеджер</b><small>ТАДЖИКИСТАН</small></span>
+      </a>
+      <nav>
+        <a class="nav-link active" href="#overview" data-view="overview"><span>◫</span>Обзор</a>
+        <a class="nav-link" href="#projects" data-view="projects"><span>◇</span>Проекты <em id="navCount">0</em></a>
+        <a class="nav-link" href="#pipeline" data-view="pipeline"><span>⌁</span>Воронка</a>
+        <a class="nav-link" href="#meetings" data-view="meetings"><span>▣</span>План встреч <em id="meetingNavCount">0</em></a>
+        <a class="nav-link" href="#contacts" data-view="contacts"><span>◎</span>Контактные лица <em id="contactNavCount">0</em></a>
+        <a class="nav-link" href="#sources" data-view="sources"><span>⌕</span>Источники</a>
+      </nav>
+      <div class="scan-card">
+        <div class="scan-head"><span class="pulse"></span><b>Мониторинг</b></div>
+        <p>Проверено источников</p>
+        <strong id="sourceCount">0</strong>
+        <small>Обновлено 27.08.2026</small>
+      </div>
+      <div class="user-card"><div class="avatar">KM</div><span><b>Команда KLM</b><small>Таджикистан</small></span><button aria-label="Настройки">•••</button></div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <button class="mobile-menu" id="menuBtn" aria-label="Открыть меню">☰</button>
+        <div class="global-search"><span aria-hidden="true">⌕</span><input id="globalSearch" type="search" aria-label="Глобальный поиск проектов" placeholder="Найти проект, компанию или город…"><kbd>Ctrl K</kbd></div>
+        <button class="icon-btn" id="notificationBtn" title="Уведомления" aria-label="Открыть уведомления">♢<i></i><b id="notificationCount">0</b></button>
+        <button class="primary-btn" id="scanBtn"><span>↻</span> Запустить мониторинг</button>
+      </header>
+      <aside class="notification-panel" id="notificationPanel" aria-hidden="true">
+        <div class="notification-head"><div><p class="eyebrow">ЦЕНТР СОБЫТИЙ</p><h3>Уведомления</h3></div><button id="closeNotifications" aria-label="Закрыть">×</button></div>
+        <div class="notification-permission" id="notificationPermission"><span>♢</span><div><b>Системные уведомления</b><small>Получайте сигнал браузера о новых проектах</small></div><button id="enableNotifications">Включить</button></div>
+        <div class="notification-list" id="notificationList"></div>
+        <button class="read-all" id="readAllNotifications">Отметить всё прочитанным</button>
+      </aside>
+
+      <section class="view landing-view active" id="landing">
+        <nav class="landing-nav">
+          <a class="landing-brand" href="#landing"><span class="brand-mark">K</span><span><b>KLM Менеджер</b><small>В ТАДЖИКИСТАНЕ</small></span></a>
+          <div class="landing-links"><a href="#landingCapabilities">Возможности</a><a href="#landingSources">Источники</a><a href="#landingWorkflow">Как работает</a></div>
+          <button class="landing-login" data-open-demo>Открыть панель <span>↗</span></button>
+        </nav>
+        <div class="hero">
+          <div class="hero-copy">
+            <div class="hero-tag"><span class="pulse"></span> Мониторинг проектов Таджикистана</div>
+            <h1>Находите проекты раньше, чем появится <em>тендер.</em></h1>
+            <p>KLM Менеджер в Таджикистане собирает сигналы о новых промышленных и инфраструктурных объектах, оценивает потенциал применения шинопровода и подсказывает следующий коммерческий шаг.</p>
+            <div class="hero-actions"><button class="hero-primary" data-open-demo>Открыть демо-панель <span>→</span></button><a href="#landingWorkflow">Как это работает <span>↓</span></a></div>
+            <div class="hero-proof"><div><b id="landingProjectCount">0</b><span>проектов в реестре</span></div><div><b id="landingHighCount">0</b><span>высокий потенциал</span></div><div><b id="landingSourceCount">0</b><span>ключевых источников</span></div></div>
+          </div>
+          <div class="hero-visual">
+            <div class="visual-glow"></div>
+            <div class="demo-window">
+              <div class="window-top"><div><i></i><i></i><i></i></div><span>KLM МЕНЕДЖЕР · ТАДЖИКИСТАН</span><b>● LIVE</b></div>
+              <div class="window-body">
+                <div class="demo-side"><strong>K</strong><i></i><i></i><i></i><i></i></div>
+                <div class="demo-main">
+                  <div class="demo-title"><span><small>РЫНОК ТАДЖИКИСТАНА</small><b>Приоритетные возможности</b></span><em>Август 2026</em></div>
+                  <div class="demo-stats"><span><small>Проекты</small><b id="demoProjectCount">0</b><i>реестр рынка</i></span><span><small>Средний балл</small><b id="demoAverageScore">0</b><i>из 100</i></span><span><small>В работе</small><b id="demoActionCount">0</b><i>следующий шаг</i></span></div>
+                  <div class="demo-list">
+                    <div><span class="mini-score">96</span><p><b>Рогунская ГЭС</b><small>Энергетика · Рогун</small></p><em>≈ $6,1 млрд</em></div>
+                    <div><span class="mini-score">94</span><p><b>Металлургический комплекс</b><small>Металлургия · Согд</small></p><em>≈ 6 млрд TJS</em></div>
+                    <div><span class="mini-score">92</span><p><b>Crystal Green Glass</b><small>Стекло · Душанбе</small></p><em>≈ 1,2 млрд TJS</em></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="floating-card fc-one"><span>↗</span><p><small>ПОТЕНЦИАЛ KLM</small><b>Очень высокий</b></p></div>
+            <div class="floating-card fc-two"><span>✓</span><p><small>ИСТОЧНИК</small><b>Класс A</b></p></div>
+          </div>
+        </div>
+        <div class="trust-row"><span>Источники мониторинга</span><b>ПРЕЗИДЕНТ РТ</b><b>INVESTCOM</b><b>WORLD BANK</b><b>AIIB</b><b>EBRD</b></div>
+
+        <section class="landing-section" id="landingCapabilities">
+          <div class="section-intro"><p class="eyebrow">ЕДИНОЕ РАБОЧЕЕ ПРОСТРАНСТВО</p><h2>От рыночного сигнала<br>до коммерческого действия</h2><p>Вместо десятков таблиц, закладок и переписок — понятная картина рынка с фокусом на продажах шинопровода.</p></div>
+          <div class="feature-grid">
+            <article class="feature-card featured"><span class="feature-num">01</span><div class="feature-icon">⌕</div><h3>Разведка рынка</h3><p>Новые заводы, ЦОД, гостиницы и инфраструктура из официальных публикаций и инвестиционных программ.</p><div class="feature-ui"><span>Новый сигнал</span><b>Текстильный кластер</b><small>$83,2 млн · класс A</small></div></article>
+            <article class="feature-card"><span class="feature-num">02</span><div class="feature-icon">◎</div><h3>Умная приоритизация</h3><p>Оценка 0–100 учитывает электрическую пригодность, стадию, инвестиции, доступ к ЛПР и качество данных.</p><div class="score-demo"><b>92</b><span><i style="width:92%"></i></span><small>Высокий потенциал</small></div></article>
+            <article class="feature-card"><span class="feature-num">03</span><div class="feature-icon">→</div><h3>Следующий шаг</h3><p>Каждый проект превращается в действие: найти EPC, запросить однолинейную схему или уточнить окно закупки.</p><ul><li>Установить проектировщика</li><li>Проверить закупку MEP</li><li>Подготовить решение KLM</li></ul></article>
+          </div>
+        </section>
+
+        <section class="landing-section source-showcase" id="landingSources">
+          <div class="source-copy"><p class="eyebrow">ДОКАЗАТЕЛЬНАЯ БАЗА</p><h2>Факты, которым<br>можно доверять</h2><p>Каждая сумма, стадия и компания связаны с первичной публикацией. Гипотеза никогда не отображается как подтверждённый факт.</p><div class="source-rules"><div><span>A</span><p><b>Первичный источник</b><small>Госорган, тендер, заказчик или МФО</small></p></div><div><span>B</span><p><b>Проверенный источник</b><small>Подрядчик или деловое издание</small></p></div></div></div>
+          <div class="source-stack"><article><div class="source-logo">RT</div><p><b>Президент Республики Таджикистан</b><small>Официальные открытия и новые стройки</small></p><span>Класс A</span></article><article><div class="source-logo">КИ</div><p><b>Комитет по инвестициям</b><small>Соглашения и частные инициаторы</small></p><span>Класс A</span></article><article><div class="source-logo">WB</div><p><b>Всемирный банк и МФО</b><small>Проекты, закупки и финансирование</small></p><span>Класс A</span></article></div>
+        </section>
+
+        <section class="landing-section workflow" id="landingWorkflow">
+          <div class="section-intro centered"><p class="eyebrow">ПРОСТОЙ ПРОЦЕСС</p><h2>Рынок становится управляемым</h2><p>Три шага, которые переводят открытую информацию в реальную возможность для отдела продаж.</p></div>
+          <div class="workflow-grid"><article><span>1</span><h3>Находим сигнал</h3><p>Публикация о строительстве, инвестиционное соглашение или проектный документ.</p></article><i>→</i><article><span>2</span><h3>Оцениваем потенциал</h3><p>Отрасль, мощность, стадия, участники и возможные сценарии применения KLM.</p></article><i>→</i><article><span>3</span><h3>Начинаем действие</h3><p>Назначаем ответственного, контактируем с EPC и контролируем следующий шаг.</p></article></div>
+        </section>
+
+        <section class="landing-cta"><div><p class="eyebrow">ГОТОВЫ УВИДЕТЬ РЫНОК ЦЕЛИКОМ?</p><h2>Откройте карту возможностей<br>KLM в Таджикистане.</h2></div><button class="hero-primary light" data-open-demo>Перейти в панель <span>→</span></button></section>
+        <footer class="landing-footer"><a class="landing-brand" href="#landing"><span class="brand-mark">K</span><span><b>KLM Менеджер</b><small>В ТАДЖИКИСТАНЕ</small></span></a><p>Открытый источник · Без регистрации · Данные на 27.08.2026</p><button data-open-demo>Открыть панель ↗</button></footer>
+      </section>
+
+      <section class="view" id="overview">
+        <div class="page-heading"><div><p class="eyebrow">РАБОЧЕЕ ПРОСТРАНСТВО · 27 АВГУСТА 2026</p><h1>Добрый день, команда KLM</h1><p>Рынок проектов Таджикистана — от сигнала до следующего действия.</p></div><div class="verified"><span>✓</span><div><b>Данные проверены</b><small>официальные и отраслевые источники</small></div></div></div>
+        <div class="metrics" id="metrics"></div>
+        <div class="dashboard-grid">
+          <article class="panel opportunity-panel">
+            <div class="panel-head"><div><p class="eyebrow">ПРИОРИТЕТЫ</p><h2>Лучшие возможности</h2></div><a href="#projects" data-go="projects">Все проекты →</a></div>
+            <div id="topProjects"></div>
+          </article>
+          <article class="panel market-panel">
+            <div class="panel-head"><div><p class="eyebrow">ГЕОГРАФИЯ</p><h2>Карта потенциала</h2></div><span class="live">● LIVE</span></div>
+            <div class="map-wrap">
+              <svg viewBox="0 0 500 280" role="img" aria-label="Схематичная карта регионов Таджикистана">
+                <path class="country" d="M44 135L83 95l71 8 52-41 73 31 55-22 47 32 65-5 14 43-46 28-40 52-62-8-44 33-65-27-63 13-55-47-48-16z"/>
+                <g class="map-label"><circle cx="113" cy="128" r="12"/><text x="113" y="132">7</text><text class="city" x="93" y="158">Согд</text></g>
+                <g class="map-label hot"><circle cx="278" cy="150" r="16"/><text x="278" y="154">5</text><text class="city" x="248" y="181">Душанбе</text></g>
+                <g class="map-label"><circle cx="242" cy="213" r="10"/><text x="242" y="217">3</text><text class="city" x="218" y="241">Хатлон</text></g>
+                <g class="map-label"><circle cx="397" cy="147" r="8"/><text x="397" y="151">2</text><text class="city" x="382" y="174">ГБАО</text></g>
+              </svg>
+              <div class="map-legend"><b><span id="mapProjectCount">0</span> активных сигналов</b><span>Размер точки = число проектов</span></div>
+            </div>
+          </article>
+          <article class="panel pipeline-panel"><div class="panel-head"><div><p class="eyebrow">ВОРОНКА</p><h2>Коммерческий прогресс</h2></div><a href="#pipeline" data-go="pipeline">Подробнее →</a></div><div id="miniPipeline"></div></article>
+          <article class="panel signals-panel"><div class="panel-head"><div><p class="eyebrow">НОВЫЕ СИГНАЛЫ</p><h2>Что изменилось</h2></div><span class="badge">6 новых</span></div><div id="signalFeed"></div></article>
+        </div>
+      </section>
+
+      <section class="view" id="projects">
+        <div class="page-heading compact"><div><p class="eyebrow">РЫНОК ТАДЖИКИСТАНА</p><h1>Проекты и возможности</h1><p>Проверенные объекты с оценкой применимости шинопровода.</p></div><button class="primary-btn" id="exportBtn">↓ Экспорт CSV</button></div>
+        <div class="toolbar panel">
+          <div class="filter-search"><span aria-hidden="true">⌕</span><input id="projectSearch" type="search" aria-label="Поиск по реестру проектов" placeholder="Поиск по реестру"></div>
+          <select id="sectorFilter" aria-label="Фильтр по отрасли"><option value="all">Все отрасли</option></select>
+          <select id="regionFilter" aria-label="Фильтр по региону"><option value="all">Все регионы</option></select>
+          <select id="statusFilter" aria-label="Фильтр по стадии"><option value="all">Все стадии</option></select>
+          <button class="ghost-btn" id="resetFilters">Сбросить</button>
+        </div>
+        <div class="project-stats"><span aria-live="polite">Найдено: <b id="resultCount">0</b></span><span class="legend"><i class="dot high"></i> высокий потенциал <i class="dot medium"></i> требует проверки</span></div>
+        <div class="project-grid" id="projectGrid"></div>
+        <div class="empty-state" id="emptyState"><span>⌕</span><h3>Проекты не найдены</h3><p>Измените фильтры или поисковый запрос.</p></div>
+      </section>
+
+      <section class="view" id="pipeline">
+        <div class="page-heading compact"><div><p class="eyebrow">ПРОДАЖИ</p><h1>Воронка возможностей</h1><p>Следующий шаг и коммерческий статус по каждому объекту.</p></div></div>
+        <div class="kanban" id="kanban"></div>
+      </section>
+
+      <section class="view" id="meetings">
+        <div class="page-heading compact"><div><p class="eyebrow">РАЗВИТИЕ ПРОДАЖ</p><h1>План встреч с заказчиками</h1><p>Приоритетные переговоры, цели и подготовка команды KLM.</p></div></div>
+        <div class="meeting-summary" id="meetingSummary"></div>
+        <div class="meeting-list" id="meetingList"></div>
+      </section>
+
+      <section class="view" id="contacts">
+        <div class="page-heading compact"><div><p class="eyebrow">ПОТЕНЦИАЛЬНЫЕ ЗАКАЗЧИКИ</p><h1>Контактные лица заказчиков</h1><p>Публичные представители и официальные каналы организаций по проектам.</p></div></div>
+        <div class="contact-toolbar panel"><div class="filter-search"><span aria-hidden="true">⌕</span><input id="contactSearch" type="search" aria-label="Поиск контактов заказчиков" placeholder="Найти по имени, организации или проекту"></div><span aria-live="polite">Всего контактов: <b id="contactCount">0</b></span></div>
+        <div class="contacts-grid" id="contactsGrid"></div>
+      </section>
+
+      <section class="view" id="sources">
+        <div class="page-heading compact"><div><p class="eyebrow">ДОКАЗАТЕЛЬНАЯ БАЗА</p><h1>Источники мониторинга</h1><p>Официальные публикации и отраслевые каналы для регулярной проверки.</p></div><button class="primary-btn" id="scanSourcesBtn">↻ Проверить сейчас</button></div>
+        <div class="source-summary panel"><div><span class="pulse"></span><div><b>Контур мониторинга активен</b><p>Автоматические сигналы не меняют подтверждённые данные без проверки человеком.</p></div></div><div class="grade"><b>A/B</b><small>приоритет доверия</small></div></div>
+        <div class="sources-grid" id="sourcesGrid"></div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="projectDialog" aria-labelledby="projectDialogTitle">
+    <button class="dialog-close" id="closeDialog" aria-label="Закрыть карточку проекта">×</button>
+    <div id="dialogContent"></div>
+  </dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"><span aria-hidden="true">✓</span><div><b>Мониторинг завершён</b><small>Новые сигналы добавлены в очередь проверки</small></div></div>
+  <script src="app.js"></script>
+  <script src="notifications.js"></script>
+</body>
+</html>

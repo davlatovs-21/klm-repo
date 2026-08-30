@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const ITEMS = [
   { href: "/app", label: "Проекты", exact: true },
+  { href: "/app/route", label: "Расчёт кабеленесущих систем", exact: false },
   { href: "/app/converter", label: "Конвертер спецификаций", exact: false },
 ];
 

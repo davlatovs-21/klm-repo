@@ -1,0 +1,18 @@
+#!/bin/sh
+
+branch=$(git symbolic-ref --quiet --short HEAD) || exit 0
+[ "$branch" = "main" ] || exit 0
+
+echo "Syncing main to the primary GitHub repository..."
+git push origin main || {
+  echo "Primary push failed; backup push skipped." >&2
+  exit 1
+}
+
+echo "Syncing main to the backup GitHub repository..."
+git push backup main || {
+  echo "Backup push failed. Run: git push backup main" >&2
+  exit 1
+}
+
+echo "Both GitHub repositories are synchronized."

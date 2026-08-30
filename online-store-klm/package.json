@@ -1,0 +1,14 @@
+{
+  "name": "klm-manager-tajikistan",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Панель мониторинга проектов KLM в Таджикистане",
+  "scripts": {
+    "start": "node dev-server.cjs",
+    "check": "node --check app.js && node --check notifications.js && node --check dev-server.cjs",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
