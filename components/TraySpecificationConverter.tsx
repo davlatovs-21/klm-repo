@@ -51,8 +51,8 @@ export default function TraySpecificationConverter() {
   }
 
   function download() {
-    const header = ["Поз.", "Исходное наименование", "Исходный артикул", "Наименование KLM", "Артикул KLM", "Кол-во", "Ед.", "Уверенность"];
-    const body = rows.map((row) => [row.position, row.name, row.article, row.klmName, row.klmArticle, row.klmQuantity, "шт", `${row.confidence}%`]);
+    const header = ["Поз.", "Производитель", "Серия", "Исходное наименование", "Исходный артикул", "Распознанные характеристики", "Не определено", "Наименование KLM", "Код подбора KLM", "Кол-во", "Ед.", "Уверенность"];
+    const body = rows.map((row) => [row.position, row.manufacturer, row.series, row.name, row.article, row.characteristics.join(", "), row.missingCharacteristics.join(", "), row.klmName, row.klmArticle, row.klmQuantity, "шт", `${row.confidence}%`]);
     const csv = "\uFEFF" + [header, ...body].map((line) => line.map(escapeCsv).join(";")).join("\r\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const anchor = document.createElement("a");
@@ -101,12 +101,21 @@ export default function TraySpecificationConverter() {
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px] text-left text-[12px]">
-              <thead className="bg-bg text-mute"><tr>{["Поз.", "Конкурент", "Аналог KLM", "Артикул KLM", "Кол-во", "Статус"].map((head) => <th key={head} className="px-4 py-3 font-bold">{head}</th>)}</tr></thead>
+              <thead className="bg-bg text-mute"><tr>{["Поз.", "Конкурент и характеристики", "Аналог KLM", "Код подбора KLM", "Кол-во", "Статус"].map((head) => <th key={head} className="px-4 py-3 font-bold">{head}</th>)}</tr></thead>
               <tbody className="divide-y divide-line">
                 {rows.map((row, index) => (
                   <tr key={`${row.position}-${index}`} className="align-top hover:bg-[#f8fbfc]">
                     <td className="px-4 py-4 font-mono">{row.position}</td>
-                    <td className="max-w-[270px] px-4 py-4"><p className="font-semibold">{row.name}</p><p className="mt-1 text-mute">{row.article || "Без артикула"}</p>{row.catalogName && <p className="mt-1 text-[11px] leading-snug text-mute">Каталог: {row.catalogName}</p>}<p className="mt-1 font-bold text-cur-d">{row.manufacturer}</p></td>
+                    <td className="max-w-[340px] px-4 py-4">
+                      <p className="font-semibold">{row.name}</p>
+                      <p className="mt-1 text-mute">{row.article || "Без артикула"}</p>
+                      {row.catalogName && <p className="mt-1 text-[11px] leading-snug text-mute">Каталог: {row.catalogName}</p>}
+                      <p className="mt-1 font-bold text-cur-d">{row.manufacturer}{row.series ? ` · ${row.series}` : ""}</p>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {row.characteristics.map((item) => <span key={item} className="rounded-full bg-cur-soft px-2 py-0.5 text-[10px] font-semibold text-cur-d">{item}</span>)}
+                      </div>
+                      {row.missingCharacteristics.length > 0 && <p className="mt-2 text-[10px] font-semibold text-[#996600]">Не определено: {row.missingCharacteristics.join(", ")}</p>}
+                    </td>
                     <td className="px-4 py-3"><input aria-label={`Наименование KLM для позиции ${row.position}`} value={row.klmName} onChange={(event) => update(index, { klmName: event.target.value })} className="w-full min-w-[240px] rounded-lg border border-line px-3 py-2 focus:border-cur" /></td>
                     <td className="px-4 py-3"><input aria-label={`Артикул KLM для позиции ${row.position}`} value={row.klmArticle} onChange={(event) => update(index, { klmArticle: event.target.value })} className="w-44 rounded-lg border border-line px-3 py-2 font-mono focus:border-cur" /></td>
                     <td className="px-4 py-3"><input aria-label={`Количество для позиции ${row.position}`} type="number" min="0" value={row.klmQuantity} onChange={(event) => update(index, { klmQuantity: Number(event.target.value) })} className="w-20 rounded-lg border border-line px-3 py-2 font-mono focus:border-cur" /><span className="ml-2 text-mute">шт</span></td>
