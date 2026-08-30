@@ -18,14 +18,17 @@ const SESSION_COOKIE = "klm_session";
 
 /** Кабинет и админка требуют сессии */
 const PROTECTED = ["/app", "/admin"];
+/** Конвертер лотков доступен из главного меню без входа в кабинет. */
+const PUBLIC_APP_PAGES = ["/app/converter", "/app/route"];
 /** Страницы входа: вошедшего уводим в кабинет */
 const AUTH_PAGES = ["/login", "/register"];
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const signedIn = verifySignature(req.cookies.get(SESSION_COOKIE)?.value) !== null;
+  const publicAppPage = PUBLIC_APP_PAGES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
-  if (!signedIn && PROTECTED.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+  if (!signedIn && !publicAppPage && PROTECTED.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
     const url = new URL("/login", req.nextUrl);
     // куда вернуть после входа
     url.searchParams.set("next", pathname);

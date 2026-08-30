@@ -15,7 +15,7 @@ const SNAPSHOT_RU = new Date(SNAPSHOT)
  */
 const TOOLS = [
   { href: "/calc", label: "Расчёт" },
-  { href: "/app/route", label: "Конструктор" },
+  { href: "/app/route", label: "Проектировщик" },
   { href: "/podbor", label: "Шинопровод" },
   { href: "/sravnenie", label: "Против кабеля" },
   { href: "/app/converter", label: "Лотки KLM" },

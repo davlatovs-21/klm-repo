@@ -70,7 +70,7 @@ type SaveState = "saved" | "dirty" | "saving" | "error";
 export default function RouteBuilder({
   configurationId, initialRoute, initialVersions,
 }: {
-  configurationId: string;
+  configurationId: string | null;
   initialRoute: Route | null;
   initialVersions: SavedVersion[];
 }) {
@@ -137,6 +137,7 @@ export default function RouteBuilder({
   /* автосохранение на сервер при простое; первая отрисовка ничего не шлёт */
   const firstRender = useRef(true);
   useEffect(() => {
+    if (!configurationId) return;
     if (firstRender.current) {
       firstRender.current = false;
       return;
@@ -158,6 +159,7 @@ export default function RouteBuilder({
   }, [r, configurationId]);
 
   const openVersion = async (versionId: string) => {
+    if (!configurationId) return;
     const route = await restoreVersion(configurationId, versionId);
     if (route) resetTo(route);
     setVersions(await fetchVersions(configurationId));
@@ -253,10 +255,11 @@ export default function RouteBuilder({
               role="status"
               aria-live="polite"
             >
-              {saveState === "saved" && (versions.length > 0 ? `Сохранено · версия ${versions[0].versionNo}` : "Изменений нет")}
-              {saveState === "dirty" && "Есть несохранённые правки"}
-              {saveState === "saving" && "Сохраняем…"}
-              {saveState === "error" && `Не сохранено: ${saveError}`}
+              {!configurationId && "Черновик сохраняется в этом браузере"}
+              {configurationId && saveState === "saved" && (versions.length > 0 ? `Сохранено · версия ${versions[0].versionNo}` : "Изменений нет")}
+              {configurationId && saveState === "dirty" && "Есть несохранённые правки"}
+              {configurationId && saveState === "saving" && "Сохраняем…"}
+              {configurationId && saveState === "error" && `Не сохранено: ${saveError}`}
             </p>
             <p className="mb-3 mt-1 text-[12.5px] text-mute">
               Углы подставляются сами на каждом изломе — по смене направления.

@@ -9,6 +9,8 @@ export type SourceRow = {
 };
 
 export type ConvertedRow = SourceRow & {
+  manufacturer: string;
+  catalogName: string | null;
   kind: TrayKind;
   width: number | null;
   height: number | null;
@@ -19,6 +21,28 @@ export type ConvertedRow = SourceRow & {
   confidence: number;
   status: "matched" | "review";
 };
+
+type CatalogRow = { manufacturer: string; article: string; name: string; family: string };
+const normalizeArticle = (value: string) => value.toLowerCase().replace(/[\s_]/g, "").replace(/,/g, ".");
+const CATALOG_BY_ARTICLE = new Map((catalogRows as CatalogRow[]).map((row) => [normalizeArticle(row.article), row]));
+
+export const MANUFACTURERS = [
+  { name: "DKC", aliases: /\b(dkc|дкс|combitech|s5|l5|f5)\b/i, article: /^(35|36|37|38)\d{3}$/i },
+  { name: "IEK", aliases: /\b(iek|иэк|esca)\b/i, article: /^(clp|cln|clw|cta|cpo|cpo|ct)/i },
+  { name: "EKF", aliases: /\b(ekf|экф|t-line|f-line|l-line)\b/i, article: /^(l\d{4,}|tray-|tt-)/i },
+  { name: "OSTEC", aliases: /\b(ostec|остек)\b/i, article: /^(лм|лп|лн|кн|пл)[-_\d]/i },
+  { name: "Промрукав", aliases: /промрукав|promrukav|серия\s+профи/i, article: /^(pr|лм)[-_]?\d/i },
+  { name: "КМ-профиль", aliases: /км[- ]?профиль|km[- ]?profil/i, article: /^(lp|ln|ll|kp)[-_]?\d/i },
+  { name: "СЗПК", aliases: /\b(сзпк|szpk)\b/i, article: /^сзпк/i },
+  { name: "OBO Bettermann", aliases: /\b(obo|bettermann|обо)\b/i, article: /^6\d{6}$/i },
+  { name: "KOPOS", aliases: /\b(kopos|копос)\b/i, article: /^(mks|nks|jupiter)/i },
+  { name: "Niedax", aliases: /\b(niedax|нидакс)\b/i, article: /^(rks|rkb|gus)/i },
+  { name: "Vergokan", aliases: /\b(vergokan|вергокан)\b/i, article: /^(kbs|kl|bs)/i },
+] as const;
+
+export function detectManufacturer(name: string, article: string): string {
+  return MANUFACTURERS.find((item) => item.aliases.test(name) || item.article.test(article.trim()))?.name ?? "Не определён";
+}
 
 const KIND: Array<{ kind: TrayKind; title: string; code: string; words: RegExp }> = [
   { kind: "cover", title: "Крышка лотка", code: "KLM-KR", words: /крыш|cover/i },
@@ -70,7 +94,8 @@ function dimensions(text: string) {
 }
 
 export function convertRow(row: SourceRow): ConvertedRow {
-  const text = `${row.name} ${row.article}`;
+  const catalogMatch = CATALOG_BY_ARTICLE.get(normalizeArticle(row.article));
+  const text = `${row.name} ${catalogMatch?.name ?? ""} ${row.article}`;
   const match = KIND.find((item) => item.words.test(text));
   const kind = match?.kind ?? "unknown";
   const { width, height, length } = dimensions(text);
@@ -83,6 +108,8 @@ export function convertRow(row: SourceRow): ConvertedRow {
 
   return {
     ...row,
+    manufacturer: catalogMatch?.manufacturer ?? detectManufacturer(row.name, row.article),
+    catalogName: catalogMatch?.name ?? null,
     kind,
     width,
     height,
@@ -90,9 +117,10 @@ export function convertRow(row: SourceRow): ConvertedRow {
     klmName: match ? `${match.title}${size ? ` ${size} мм` : ""}` : "Требуется ручной подбор",
     klmArticle: match ? `${match.code}${size ? `-${size}` : ""}` : "—",
     klmQuantity,
-    confidence,
+    confidence: catalogMatch ? 99 : confidence,
     status: enough ? "matched" : "review",
   };
 }
 
 export const convertRows = (rows: SourceRow[]) => rows.map(convertRow);
+import catalogRows from "./tray-catalog-index.json";

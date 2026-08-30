@@ -1,0 +1,36 @@
+{
+  "updatedAt": "2026-08-30",
+  "scope": "Основные производители и бренды металлических кабеленесущих систем, представленные на рынке России",
+  "catalogs": [
+    {
+      "manufacturer": "IEK",
+      "file": "IEK/IEK-cable-systems-2024.pdf",
+      "source": "https://www.iek.ru/upload/pictures/katalogi/kabeln-system_passw.pdf",
+      "type": "official-catalog"
+    },
+    {
+      "manufacturer": "DKC",
+      "file": "DKC/DKC-catalog-snapshot-2026.html",
+      "source": "https://www.dkc.ru/ru/catalog/22/",
+      "type": "official-web-catalog-snapshot"
+    },
+    {
+      "manufacturer": "EKF",
+      "file": "EKF/EKF-pricelist-2026-08-30.xlsx",
+      "source": "https://api.ekfgroup.com/storage/prices/ekf_pricelist_2026-08-30.xlsx",
+      "type": "official-price-catalog"
+    },
+    {
+      "manufacturer": "OSTEC",
+      "file": "OSTEC/OSTEC-cable-systems-2026.pdf",
+      "source": "https://ostec.ru/upload/iblock/8f6/pzycfcds96acmxzbd4xznskgzokl1k4g/Ostec_catalog_2026_2407.pdf",
+      "type": "official-catalog"
+    },
+    {
+      "manufacturer": "Промрукав",
+      "file": "Promrukav/Promrukav-metal-trays-2025.pdf",
+      "source": "https://www.promrukav.ru/upload/promrukav_katalog_metallicheskie_lotki_10-2025.pdf",
+      "type": "official-catalog"
+    }
+  ]
+}

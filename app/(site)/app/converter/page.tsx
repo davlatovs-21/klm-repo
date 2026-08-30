@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { requireSession } from "@/lib/dal";
 import { Section } from "@/components/ui";
 import TraySpecificationConverter from "@/components/TraySpecificationConverter";
 
@@ -8,9 +7,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function ConverterPage() {
-  await requireSession();
-
+export default function ConverterPage() {
   return (
     <main>
       <Section>
