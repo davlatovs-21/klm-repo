@@ -31,6 +31,18 @@
       "file": "Promrukav/Promrukav-metal-trays-2025.pdf",
       "source": "https://www.promrukav.ru/upload/promrukav_katalog_metallicheskie_lotki_10-2025.pdf",
       "type": "official-catalog"
+    },
+    {
+      "manufacturer": "EAE",
+      "file": "EAE/EAE-cable-support-systems.pdf",
+      "source": "https://www.eae.com.tr/storage/kataloglar/kablo-kanallari/e-line-kca-og.pdf",
+      "type": "official-catalog"
+    },
+    {
+      "manufacturer": "EAE / Макинтех",
+      "file": "Makinteh/Makinteh-EAE-products.json",
+      "source": "https://ensaving.ru/sitemap.xml",
+      "type": "official-representative-web-index"
     }
   ]
 }

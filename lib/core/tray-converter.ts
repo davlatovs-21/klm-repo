@@ -27,6 +27,7 @@ const normalizeArticle = (value: string) => value.toLowerCase().replace(/[\s_]/g
 const CATALOG_BY_ARTICLE = new Map((catalogRows as CatalogRow[]).map((row) => [normalizeArticle(row.article), row]));
 
 export const MANUFACTURERS = [
+  { name: "EAE", aliases: /\b(eae|еае|e-line|ukfg|uks|ukd|ctk|kca)\b/i, article: /^(30|31|32)\d{5}$/i },
   { name: "DKC", aliases: /\b(dkc|дкс|combitech|s5|l5|f5)\b/i, article: /^(35|36|37|38)\d{3}$/i },
   { name: "IEK", aliases: /\b(iek|иэк|esca)\b/i, article: /^(clp|cln|clw|cta|cpo|cpo|ct)/i },
   { name: "EKF", aliases: /\b(ekf|экф|t-line|f-line|l-line)\b/i, article: /^(l\d{4,}|tray-|tt-)/i },
@@ -83,6 +84,8 @@ export function rowsFromMatrix(matrix: unknown[][]): SourceRow[] {
 }
 
 function dimensions(text: string) {
+  const eae = text.match(/\b(\d{2,3})\s+(?:UKD|UKS|UKFG|UKF|CT|CTK|CTH|TLS|KM|KMH)\s+(\d{2,3})\b/i);
+  if (eae) return { width: Number(eae[2]), height: Number(eae[1]), length: 3000 };
   const groups = [...text.matchAll(/(\d{2,4})\s*[xх×*]\s*(\d{2,4})(?:\s*[xх×*]\s*(\d{2,4}))?/gi)];
   if (!groups.length) return { width: null, height: null, length: null };
   const [, a, b, c] = groups[0];

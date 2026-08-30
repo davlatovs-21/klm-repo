@@ -32,3 +32,12 @@ test("находит описание по одному артикулу из к
   assert.equal(row.height, 50);
   assert.equal(row.confidence, 99);
 });
+
+test("распознаёт производителя и модель EAE", () => {
+  assert.equal(detectManufacturer("050 UKD 400 E-Line", "3048059"), "EAE");
+  const row = convertRow({ position: "1", name: "EAE", article: "3048071", quantity: 5, unit: "шт" });
+  assert.equal(row.manufacturer, "EAE");
+  assert.equal(row.width, 200);
+  assert.equal(row.height, 100);
+  assert.equal(row.confidence, 99);
+});

@@ -6,6 +6,7 @@ const XLSX = require("xlsx");
 const root = path.resolve(__dirname, "..");
 const ekfFile = path.join(root, "Лоток", "catalogs", "EKF", "EKF-pricelist-2026-08-30.xlsx");
 const output = path.join(root, "lib", "core", "tray-catalog-index.json");
+const makintehFile = path.join(root, "Лоток", "catalogs", "Makinteh", "Makinteh-EAE-products.json");
 
 const workbook = XLSX.readFile(ekfFile);
 const matrix = XLSX.utils.sheet_to_json(workbook.Sheets["Продукция EKF"], { header: 1, defval: "" });
@@ -34,6 +35,7 @@ const officialExamples = [
   { manufacturer: "IEK", article: "CLP10-050-100-100-3", name: "Лоток перфорированный 50x100x3000-1,0", family: "ESCA" }
 ];
 
-const rows = [...ekf, ...officialExamples].sort((a, b) => a.manufacturer.localeCompare(b.manufacturer) || a.article.localeCompare(b.article));
+const eae = fs.existsSync(makintehFile) ? JSON.parse(fs.readFileSync(makintehFile, "utf8")) : [];
+const rows = [...ekf, ...officialExamples, ...eae].sort((a, b) => a.manufacturer.localeCompare(b.manufacturer) || a.article.localeCompare(b.article));
 fs.writeFileSync(output, `${JSON.stringify(rows)}\n`, "utf8");
 console.log(`Записано ${rows.length} позиций: ${output}`);

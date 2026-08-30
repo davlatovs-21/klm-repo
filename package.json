@@ -13,7 +13,8 @@
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx --env-file=.env.local lib/db/seed.ts",
     "test:db": "tsx --env-file=.env.local --test --test-concurrency=1 lib/db/*.test.ts",
-    "catalog:index": "node scripts/build-tray-catalog-index.cjs"
+    "catalog:index": "node scripts/build-tray-catalog-index.cjs",
+    "catalog:makinteh": "node scripts/scrape-makinteh-trays.cjs && node scripts/build-tray-catalog-index.cjs"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",
