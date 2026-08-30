@@ -18,6 +18,7 @@ const TOOLS = [
   { href: "/app/route", label: "Конструктор" },
   { href: "/podbor", label: "Шинопровод" },
   { href: "/sravnenie", label: "Против кабеля" },
+  { href: "/app/converter", label: "Лотки KLM" },
 ];
 
 const ABOUT = [
