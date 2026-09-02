@@ -1,3 +1,5 @@
+import { RATED_CODE } from "./klm-catalog";
+
 export type SourceRow = { position: string; name: string; article: string; quantity: number; unit: string };
 export type ConvertedRow = SourceRow & { manufacturer: string; catalogName: string | null; series: string | null; characteristics: string[]; missingCharacteristics: string[]; klmName: string; klmArticle: string; klmQuantity: number; confidence: number; status: "matched" | "review" };
 
@@ -14,8 +16,9 @@ const KINDS = [
   { label: "Противопожарная проходка", code: "FB", re: /огнестой|противопожар|fire barrier/i },
   { label: "Секция угловая горизонтальная", code: "CD", re: /горизонт.*уг|уг.*горизонт|horizontal elbow/i },
   { label: "Секция угловая вертикальная", code: "CP", re: /вертикал.*уг|уг.*вертикал|vertical elbow/i },
-  { label: "Секция тройниковая", code: "T", re: /тройник|т[- ]?образ|tee unit/i },
-  { label: "Секция присоединительная", code: "AT", re: /присоедин|подключен|трансформатор|вводн|feeder|transformer connection/i },
+  { label: "Секция тройниковая горизонтальная", code: "TD", re: /тройник|т[- ]?образ|tee unit/i },
+  { label: "Секция присоединительная к трансформатору", code: "ATT", re: /трансформатор|transformer connection/i },
+  { label: "Секция присоединительная к панелям", code: "ATSC", re: /присоедин|подключен|вводн|feeder/i },
   { label: "Концевая заглушка", code: "EC", re: /заглуш|end (?:cap|cover)/i },
   { label: "Стыковочный элемент", code: "G", re: /стыков|соединит|joint/i },
   { label: "Крепление шинопровода", code: "SUP", re: /креплен|подвес|кронштейн|hanger|support/i },
@@ -37,7 +40,7 @@ function convertRow(row: SourceRow): ConvertedRow {
   const text = `${row.name} ${row.article}`;
   const brand = BRANDS.find((item) => item.re.test(text)), series = brand?.series.exec(text)?.[0] ?? null, kind = KINDS.find((item) => item.re.test(text));
   const pitonArticle = text.match(/\b(?:e3|cr1|crm|a5|l1|et|d4)-(\d{2})-(al|cu)-([345])-(\d{2,4})\b/i);
-  const currentMatch = text.match(/\b(25|40|63|100|125|140|160|200|225|250|315|400|500|600|630|800|1000|1250|1600|2000|2500|3200|4000|5000|6300|6400|7500)\s*(?:а|a|amp)\b/i);
+  const currentMatch = text.match(/\b(25|40|63|100|125|140|160|200|225|250|315|400|500|600|630|800|1000|1250|1600|2000|2500|3200|4000|5000|6300|6400|7500)\s*(?:а|a|amp)(?=$|[^a-zа-яё0-9])/i);
   const current = currentMatch ? Number(currentMatch[1]) : pitonArticle ? Number(pitonArticle[4]) : null;
   const material = /\b(cu|медн|медь)\b/i.test(text) ? "Cu" : /\b(al|алюм)\b/i.test(text) ? "Al" : null;
   const ip = Number(text.match(/\bip\s*(\d{2})\b/i)?.[1] ?? pitonArticle?.[1]) || null;
@@ -47,18 +50,18 @@ function convertRow(row: SourceRow): ConvertedRow {
   // У KLM нет исполнения 3P: 3L+PE (корпус) и 3L+N+PE (корпус) — 4P,
   // отдельный защитный проводник в 3L+N+PE — 5P.
   const poles = hasNeutralAndPe ? 5 : hasNeutral ? 4 : sourcePoles === 5 ? 5 : sourcePoles === 3 || sourcePoles === 4 ? 4 : null;
-  const missing = [!kind && "тип элемента", !current && "номинальный ток", !material && "материал шин", !ip && "IP", !poles && "число проводников"].filter(Boolean) as string[];
+  const conductorCode = hasNeutralAndPe ? 5 : hasNeutral ? 4 : sourcePoles === 5 ? 5 : sourcePoles === 3 ? 3 : sourcePoles === 4 ? 4 : null;
+  const ratedCode = current == null ? null : RATED_CODE[current] ?? null;
+  const missing = [!kind && "тип элемента", !current && "номинальный ток", current != null && !ratedCode && "номинал отсутствует в ряду KLM-S", !material && "материал шин", !ip && "IP", !poles && "число проводников"].filter(Boolean) as string[];
   const characteristics = [current && `${current} А`, material, ip && `IP${ip}`, poles && `${poles}P`].filter(Boolean).map(String);
   const label = kind?.label ?? "Элемент шинопровода";
-  const confirmedArticle = current == null
-    ? null
-    : kind?.code === "S"
-      ? `SHMA-${current}A`
-      : kind?.code === "PI"
-        ? `SHRA-${current}A`
-      : kind?.code === "PB"
-        ? `TAPP-OFF-${current}A`
-        : null;
+  const sectionCode = kind?.code === "S" ? "FE" : kind?.code === "PI" ? "Pi" : kind?.code ?? null;
+  // Грамматика артикула KLM-S, каталог V3, стр. 5:
+  // тип - код номинала - материал - IP - проводники - корпус - секция.
+  // Корпус 3 — штатный алюминиевый корпус системы KLM-S.
+  const confirmedArticle = ratedCode && material && ip && conductorCode && sectionCode
+    ? ["KLM-S", ratedCode, material, ip, conductorCode, 3, sectionCode].join("-")
+    : null;
   const requiresReview = missing.length > 0 || confirmedArticle == null;
   return { ...row, manufacturer: brand?.name ?? "Не определён", catalogName: brand ? `${brand.name}${series ? ` · ${series}` : ""}` : null, series, characteristics, missingCharacteristics: missing, klmName: `${label}${current ? ` ${current} А` : ""}${material ? ` ${material}` : ""}${ip ? ` IP${ip}` : ""}${poles ? ` ${poles}P` : ""}`, klmArticle: confirmedArticle ?? "Требуется заводской артикул", klmQuantity: row.quantity, confidence: Math.max(20, 100 - missing.length * 16 - (!brand ? 8 : 0)), status: requiresReview ? "review" : "matched" };
 }

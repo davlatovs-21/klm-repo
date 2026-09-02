@@ -11,7 +11,7 @@ test("распознаёт Canalis и формирует аналог прямо
   assert.equal(result.manufacturer, "Schneider Electric");
   assert.equal(result.series?.toLowerCase(), "canalis kta");
   assert.deepEqual(result.characteristics, ["1600 А", "Al", "IP55", "4P"]);
-  assert.equal(result.klmArticle, "SHMA-1600A");
+  assert.equal(result.klmArticle, "KLM-S-16-Al-55-4-3-FE");
   assert.equal(result.status, "matched");
 });
 
@@ -34,7 +34,7 @@ test("преобразует 3P+N+PE в допустимое исполнени�
   const [result] = convertRows([{ position: "3.7", name: "Секция прямая Al, 3P+N+Pe, 4000A, IP55", article: "", quantity: 1, unit: "шт" }]);
   assert.deepEqual(result.characteristics, ["4000 А", "Al", "IP55", "5P"]);
   assert.equal(result.klmName, "Секция прямая 4000 А Al IP55 5P");
-  assert.equal(result.klmArticle, "SHMA-4000A");
+  assert.equal(result.klmArticle, "KLM-S-40-Al-55-5-3-FE");
   assert.equal(result.status, "matched");
 });
 
@@ -45,18 +45,24 @@ test("никогда не выдаёт несуществующее исполн
   assert.doesNotMatch(result.klmArticle, /3P/);
 });
 
-test("различает SHMA без точек отбора и SHRA с точками отбора", () => {
+test("различает заводские коды FE и Pi", () => {
   const rows = convertRows([
     { position: "1", name: "Секция прямая без точек отбора 800A Al IP55 4P", article: "", quantity: 1, unit: "шт" },
     { position: "2", name: "Секция прямая с точками отбора 800A Al IP55 4P", article: "", quantity: 1, unit: "шт" },
   ]);
-  assert.equal(rows[0].klmArticle, "SHMA-800A");
-  assert.equal(rows[1].klmArticle, "SHRA-800A");
+  assert.equal(rows[0].klmArticle, "KLM-S-08-Al-55-4-3-FE");
+  assert.equal(rows[1].klmArticle, "KLM-S-08-Al-55-4-3-Pi");
 });
 
-test("не выдумывает заводской артикул для присоединительной секции", () => {
+test("формирует заводской артикул присоединительной секции ATT", () => {
   const [result] = convertRows([{ position: "3.8", name: "Секция подключения к трансформатору Al, 3P+N+Pe, 4000A, IP55", article: "", quantity: 1, unit: "шт" }]);
-  assert.equal(result.klmName, "Секция присоединительная 4000 А Al IP55 5P");
-  assert.equal(result.klmArticle, "Требуется заводской артикул");
-  assert.equal(result.status, "review");
+  assert.equal(result.klmName, "Секция присоединительная к трансформатору 4000 А Al IP55 5P");
+  assert.equal(result.klmArticle, "KLM-S-40-Al-55-5-3-ATT");
+  assert.equal(result.status, "matched");
+});
+
+test("формирует заводской артикул горизонтального угла 2000 А", () => {
+  const [result] = convertRows([{ position: "3.24", name: "Горизонтальный угол стандартный, тип 2, Al, 3P+N+Pe, 2000А, IP55", article: "1.М.2-3-2000А", quantity: 1, unit: "шт" }]);
+  assert.equal(result.klmArticle, "KLM-S-20-Al-55-5-3-CD");
+  assert.equal(result.status, "matched");
 });
