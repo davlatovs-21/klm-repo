@@ -18,8 +18,8 @@ const SESSION_COOKIE = "klm_session";
 
 /** Кабинет и админка требуют сессии */
 const PROTECTED = ["/app", "/admin"];
-/** Конвертер лотков доступен из главного меню без входа в кабинет. */
-const PUBLIC_APP_PAGES = ["/app/converter", "/app/route"];
+/** Инженерные расчёты доступны из главного меню без входа в кабинет. */
+const PUBLIC_APP_PAGES = ["/app/converter", "/app/busbar-converter", "/app/route"];
 /** Страницы входа: вошедшего уводим в кабинет */
 const AUTH_PAGES = ["/login", "/register"];
 

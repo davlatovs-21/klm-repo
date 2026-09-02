@@ -15,10 +15,11 @@ const SNAPSHOT_RU = new Date(SNAPSHOT)
  */
 const TOOLS = [
   { href: "/calc", label: "Расчёт" },
+  { href: "/app/busbar-converter", label: "Расчёт спецификации шинопровода" },
   { href: "/app/route", label: "Проектировщик" },
   { href: "/podbor", label: "Шинопровод" },
   { href: "/sravnenie", label: "Против кабеля" },
-  { href: "/app/converter", label: "Лотки KLM" },
+  { href: "/app/converter", label: "Расчёт лотка" },
 ];
 
 const ABOUT = [
@@ -54,9 +55,9 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
           <div className="ml-auto hidden items-center gap-1 lg:flex">
             {TOOLS.map((n) => (
               <Link
-                key={n.href}
+                key={`${n.href}-${n.label}`}
                 href={n.href}
-                className="whitespace-nowrap rounded-full px-3 py-1.5 text-[13px] font-semibold tracking-[-0.01em] text-ink-2 transition-colors hover:bg-surface hover:text-ink"
+                className="whitespace-nowrap rounded-full px-2.5 py-1.5 text-[13px] font-semibold tracking-[-0.01em] text-ink-2 transition-colors hover:bg-surface hover:text-ink"
               >
                 {n.label}
               </Link>
@@ -92,7 +93,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
             <h2 className="eyebrow text-mute">Инструменты</h2>
             <ul className="mt-3 grid gap-2">
               {TOOLS.map((n) => (
-                <li key={n.href}>
+                <li key={`${n.href}-${n.label}`}>
                   <Link href={n.href} className="text-[13px] font-semibold transition-colors hover:text-cur-d">
                     {n.label}
                   </Link>

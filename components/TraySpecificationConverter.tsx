@@ -2,9 +2,18 @@
 
 import { useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
-import { convertRows, rowsFromMatrix, type ConvertedRow } from "@/lib/core/tray-converter";
+import * as busbar from "@/lib/core/busbar-spec-converter";
+import * as tray from "@/lib/core/tray-converter";
 
-const SAMPLE = [
+const BUSBAR_SAMPLE = [
+  ["Поз.", "Наименование", "Артикул", "Кол-во", "Ед."],
+  [1, "Schneider Canalis KTA прямая секция 1600A Al IP55 4P", "KTA1600ED4", 8, "шт"],
+  [2, "EAE E-Line KO-II коробка отбора 250 A IP55 4P", "KO-II-BOX-250", 12, "шт"],
+  [3, "ДКС Powertech секция угловая горизонтальная 2500 А Cu IP55 4P", "", 2, "шт"],
+  [4, "Legrand Zucchini концевая заглушка 800A Al IP55 4P", "", 1, "шт"],
+];
+
+const TRAY_SAMPLE = [
   ["Поз.", "Наименование", "Артикул", "Кол-во", "Ед."],
   [1, "Лоток перфорированный 200x80x3000", "CON-200-80", 24, "шт"],
   [2, "Крышка лотка 200x3000", "CON-C-200", 72, "м"],
@@ -12,41 +21,66 @@ const SAMPLE = [
   [4, "Соединитель лотка 80", "CON-J", 30, "шт"],
 ];
 
+type UiRow = busbar.ConvertedRow | tray.ConvertedRow;
+
 function escapeCsv(value: unknown) {
   return `"${String(value ?? "").replaceAll('"', '""')}"`;
 }
 
-export default function TraySpecificationConverter() {
+export default function TraySpecificationConverter({ mode = "tray" }: { mode?: "tray" | "busbar" }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState("");
-  const [rows, setRows] = useState<ConvertedRow[]>([]);
+  const [rows, setRows] = useState<UiRow[]>([]);
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [loadingText, setLoadingText] = useState("");
   const matched = useMemo(() => rows.filter((row) => row.status === "matched").length, [rows]);
 
   async function load(file: File) {
     setError("");
+    setLoading(true);
+    setLoadingText("Читаем файл…");
     try {
-      const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "" });
-      const source = rowsFromMatrix(matrix);
+      const data = await file.arrayBuffer();
+      let matrix: unknown[][];
+      if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+        const { matrixFromPdf } = await import("@/lib/client/pdf-specification");
+        matrix = await matrixFromPdf(data, (progress) => {
+          if (progress.stage === "ocr") {
+            const percent = Math.round((progress.progress ?? 0) * 100);
+            setLoadingText(`OCR: страница ${progress.page} из ${progress.totalPages}${percent ? ` · ${percent}%` : ""}`);
+          } else {
+            setLoadingText(`Читаем PDF: страница ${progress.page} из ${progress.totalPages}`);
+          }
+        });
+      } else {
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "" });
+      }
+      const source = mode === "busbar" ? busbar.rowsFromMatrix(matrix) : tray.rowsFromMatrix(matrix);
       if (!source.length) throw new Error("Не удалось найти строки с наименованиями");
-      setRows(convertRows(source));
+      setRows(mode === "busbar" ? busbar.convertRows(source) : tray.convertRows(source));
       setFileName(file.name);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Не удалось прочитать файл");
       setRows([]);
+    } finally {
+      setLoading(false);
+      setLoadingText("");
     }
   }
 
   function loadSample() {
-    setRows(convertRows(rowsFromMatrix(SAMPLE)));
+    const matrix = mode === "busbar" ? BUSBAR_SAMPLE : TRAY_SAMPLE;
+    const source = mode === "busbar" ? busbar.rowsFromMatrix(matrix) : tray.rowsFromMatrix(matrix);
+    setRows(mode === "busbar" ? busbar.convertRows(source) : tray.convertRows(source));
     setFileName("Пример спецификации.xlsx");
     setError("");
   }
 
-  function update(index: number, patch: Partial<ConvertedRow>) {
+  function update(index: number, patch: Partial<UiRow>) {
     setRows((current) => current.map((row, i) => i === index ? { ...row, ...patch } : row));
   }
 
@@ -71,12 +105,12 @@ export default function TraySpecificationConverter() {
           onDrop={(event) => { event.preventDefault(); setDragging(false); const file = event.dataTransfer.files[0]; if (file) void load(file); }}
           className={`rounded-xl2 border-2 border-dashed p-7 text-center transition-colors ${dragging ? "border-cur bg-cur-soft" : "border-line-2 bg-surface"}`}
         >
-          <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv,.tsv" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void load(file); }} />
+          <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv,.tsv,.pdf,application/pdf" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void load(file); event.target.value = ""; }} />
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-cur-soft text-2xl text-cur-d">↑</div>
           <h2 className="display mt-4 text-[18px]">Загрузите спецификацию конкурента</h2>
-          <p className="mx-auto mt-2 max-w-lg text-[13px] leading-relaxed text-mute">Excel или CSV. Желательные столбцы: позиция, наименование, артикул, количество и единица измерения.</p>
+          <p className="mx-auto mt-2 max-w-lg text-[13px] leading-relaxed text-mute">Excel, CSV, обычный или сканированный PDF. Сканы и PDF с повреждённым текстом распознаются через OCR. Желательные столбцы: позиция, наименование, артикул, количество и единица измерения.</p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">
-            <button onClick={() => inputRef.current?.click()} className="rounded-full bg-ink px-5 py-2.5 text-[13px] font-bold text-white hover:bg-ink-2">Выбрать файл</button>
+            <button disabled={loading} onClick={() => inputRef.current?.click()} className="rounded-full bg-ink px-5 py-2.5 text-[13px] font-bold text-white hover:bg-ink-2 disabled:cursor-wait disabled:opacity-60">{loading ? loadingText : "Выбрать файл"}</button>
             <button onClick={loadSample} className="rounded-full border border-line-2 px-5 py-2.5 text-[13px] font-bold hover:border-cur">Посмотреть пример</button>
           </div>
           {error && <p className="mt-4 text-[13px] font-semibold text-fault">{error}</p>}
@@ -85,11 +119,18 @@ export default function TraySpecificationConverter() {
         <div className="rounded-xl2 bg-ink p-6 text-white">
           <p className="eyebrow text-cur">Как работает подбор</p>
           <ol className="mt-5 space-y-4 text-[13px]">
-            {["Читаем строки и определяем тип изделия", "Извлекаем ширину, высоту и длину", "Формируем аналог и артикул KLM", "Помечаем неоднозначные позиции для проверки"].map((text, index) => (
+            {(mode === "busbar"
+              ? ["Определяем производителя, серию и тип элемента", "Извлекаем ток, материал, IP и число проводников", "Формируем предварительный аналог KLM", "Помечаем неполные позиции для проверки инженером"]
+              : ["Читаем строки и определяем тип изделия", "Извлекаем ширину, высоту и длину", "Формируем аналог и артикул KLM", "Помечаем неоднозначные позиции для проверки"]
+            ).map((text, index) => (
               <li key={text} className="flex gap-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-cur text-[11px] font-bold">{index + 1}</span><span className="pt-0.5 text-[#c2d5dc]">{text}</span></li>
             ))}
           </ol>
-          <p className="mt-6 border-t border-white/10 pt-4 text-[11px] leading-relaxed text-[#8fb4c0]">Автоподбор предварительный. Перед заказом инженер должен сверить исполнение, толщину металла, покрытие и нагрузку.</p>
+          <p className="mt-6 border-t border-white/10 pt-4 text-[11px] leading-relaxed text-[#8fb4c0]">
+            {mode === "busbar"
+              ? "Автоподбор предварительный. Перед заказом инженер должен сверить Icw/Ipk, падение напряжения, конфигурацию проводников, огнестойкость и совместимость присоединений."
+              : "Автоподбор предварительный. Перед заказом инженер должен сверить исполнение, толщину металла, покрытие и нагрузку."}
+          </p>
         </div>
       </div>
 

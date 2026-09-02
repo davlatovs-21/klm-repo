@@ -1,0 +1,22 @@
+{
+  "checkedAt": "2026-09-02",
+  "scope": "Официальные каталоги производителей из справочника аналогов KLM",
+  "catalogGaps": [
+    { "manufacturer": "PitON Electric", "series": "D4", "status": "Серия есть на официальной странице, отдельная публичная PDF-ссылка не опубликована", "page": "https://pitonelectric.ru/products/shinoprovody-tokoprovody/" }
+  ],
+  "sources": [
+    { "manufacturer": "EAE", "series": ["E-Line KO-II"], "file": "EAE-E-Line-KO-II-RU.pdf", "url": "https://www.eaeelectric.com/storage/ru/catalogs/busbar-systems/KO-II_RU_Rev17_web.pdf", "language": "ru" },
+    { "manufacturer": "ДКС", "series": ["Hercules", "Distritech", "Powertech", "Vibitech"], "file": "DKC-Hercules-RU.pdf", "url": "https://www.dkc.ru/upload/dkc/pub/Downloads/Catalog/35/Solutions_for_power_distribution_systems/Catalog_Hercules.pdf", "language": "ru" },
+    { "manufacturer": "Legrand", "series": ["Zucchini"], "file": "Legrand-Zucchini-RU.pdf", "url": "https://assets.legrand.com/webf/kz/kz_ru_Busbar_Catalogue_DC504RU_low_102025.pdf", "language": "ru" },
+    { "manufacturer": "Siemens", "series": ["SIVACON 8PS"], "file": "Siemens-SIVACON-8PS-EN.pdf", "url": "https://cache.industry.siemens.com/dl/files/425/109478425/att_1352271/v1/2c3de840-6ece-4de5-ba4e-831e8e837e3a.pdf", "language": "en" },
+    { "manufacturer": "Schneider Electric", "series": ["Canalis"], "file": "Schneider-Canalis-EN.pdf", "url": "https://download.schneider-electric.com/files?p_Doc_Ref=Cat_Canalis19UK&p_enDocType=Catalog&p_File_Name=Cat_Canalis.pdf", "language": "en" },
+    { "manufacturer": "PitON Electric", "series": ["E3"], "file": "PitON-E3-RU.pdf", "url": "https://pitonelectric.ru/uploads/shinoprovod_e3.pdf", "language": "ru" },
+    { "manufacturer": "PitON Electric", "series": ["E3"], "file": "PitON-E3-EN.pdf", "url": "https://pitonelectric.ru/uploads/catalogE3en.pdf", "language": "en" },
+    { "manufacturer": "PitON Electric", "series": ["E3", "CR1", "расчёт нагрузки"], "file": "PitON-E3-CR1-load-calculation-RU.pdf", "url": "https://pitonelectric.ru/uploads/raschet-nagruzki-%D0%953.pdf", "language": "ru" },
+    { "manufacturer": "PitON Electric", "series": ["CR1"], "file": "PitON-CR1-RU.pdf", "url": "https://pitonelectric.ru/uploads/Piton_buklet_CR-1.pdf", "language": "ru" },
+    { "manufacturer": "PitON Electric", "series": ["CRM"], "file": "PitON-CRM-RU.pdf", "url": "https://pitonelectric.ru/uploads/catalogcrm.pdf", "language": "ru" },
+    { "manufacturer": "PitON Electric", "series": ["A5"], "file": "PitON-A5-RU.pdf", "url": "https://pitonelectric.ru/uploads/catalog_A5.pdf", "language": "ru" },
+    { "manufacturer": "PitON Electric", "series": ["L1", "осветительный"], "file": "PitON-L1-lighting-RU.pdf", "url": "https://pitonelectric.ru/uploads/shinoprovody-osvetitelnye.pdf", "language": "ru" },
+    { "manufacturer": "PitON Electric", "series": ["ET", "троллейный"], "file": "PitON-ET-trolley-RU.pdf", "url": "https://pitonelectric.ru/uploads/trolleinii_shinoprovod.pdf", "language": "ru" }
+  ]
+}

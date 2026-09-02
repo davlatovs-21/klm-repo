@@ -18,12 +18,16 @@
   },
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",
+    "@tesseract.js-data/eng": "^1.0.0",
+    "@tesseract.js-data/rus": "^1.0.0",
     "drizzle-orm": "^0.45.2",
     "next": "^16.3.0",
+    "pdfjs-dist": "^6.3.289",
     "postgres": "^3.4.9",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "server-only": "^0.0.1",
+    "tesseract.js": "^7.0.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

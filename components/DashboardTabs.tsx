@@ -6,7 +6,8 @@ import { usePathname } from "next/navigation";
 const ITEMS = [
   { href: "/app", label: "Проекты", exact: true },
   { href: "/app/route", label: "Расчёт кабеленесущих систем", exact: false },
-  { href: "/app/converter", label: "Конвертер спецификаций", exact: false },
+  { href: "/app/busbar-converter", label: "Спецификация шинопровода", exact: false },
+  { href: "/app/converter", label: "Расчёт лотка", exact: false },
 ];
 
 export default function DashboardTabs() {
