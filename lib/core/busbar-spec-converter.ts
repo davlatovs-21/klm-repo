@@ -15,10 +15,11 @@ const KINDS = [
   { label: "Секция угловая горизонтальная", code: "CD", re: /горизонт.*уг|уг.*горизонт|horizontal elbow/i },
   { label: "Секция угловая вертикальная", code: "CP", re: /вертикал.*уг|уг.*вертикал|vertical elbow/i },
   { label: "Секция тройниковая", code: "T", re: /тройник|т[- ]?образ|tee unit/i },
-  { label: "Секция присоединительная", code: "AT", re: /присоедин|вводн|feeder|transformer connection/i },
+  { label: "Секция присоединительная", code: "AT", re: /присоедин|подключен|трансформатор|вводн|feeder|transformer connection/i },
   { label: "Концевая заглушка", code: "EC", re: /заглуш|end (?:cap|cover)/i },
   { label: "Стыковочный элемент", code: "G", re: /стыков|соединит|joint/i },
   { label: "Крепление шинопровода", code: "SUP", re: /креплен|подвес|кронштейн|hanger|support/i },
+  { label: "Секция прямая с точками отбора", code: "PI", re: /с\s+(?:точк|окн).*отбор|distribution unit.*(?:tap|plug)/i },
   { label: "Секция прямая", code: "S", re: /прям.*секц|секц.*прям|шинопровод|busbar|busway|straight length/i },
 ] as const;
 const number = (value: unknown, fallback = 0) => { const parsed = Number(String(value ?? "").replace(/\s/g, "").replace(",", ".")); return Number.isFinite(parsed) ? parsed : fallback; };
@@ -39,10 +40,26 @@ function convertRow(row: SourceRow): ConvertedRow {
   const currentMatch = text.match(/\b(25|40|63|100|125|140|160|200|225|250|315|400|500|600|630|800|1000|1250|1600|2000|2500|3200|4000|5000|6300|6400|7500)\s*(?:а|a|amp)\b/i);
   const current = currentMatch ? Number(currentMatch[1]) : pitonArticle ? Number(pitonArticle[4]) : null;
   const material = /\b(cu|медн|медь)\b/i.test(text) ? "Cu" : /\b(al|алюм)\b/i.test(text) ? "Al" : null;
-  const ip = Number(text.match(/\bip\s*(\d{2})\b/i)?.[1] ?? pitonArticle?.[1]) || null, poles = Number(text.match(/\b([345])\s*(?:p|полюс|проводник)/i)?.[1] ?? pitonArticle?.[3]) || null;
+  const ip = Number(text.match(/\bip\s*(\d{2})\b/i)?.[1] ?? pitonArticle?.[1]) || null;
+  const hasNeutralAndPe = /3\s*(?:p|l|ф)\s*\+\s*n\s*\+\s*pe\b/i.test(text);
+  const hasNeutral = /3\s*(?:p|l|ф)\s*\+\s*n\b/i.test(text);
+  const sourcePoles = Number(text.match(/\b([345])\s*(?:p|полюс|проводник)/i)?.[1] ?? pitonArticle?.[3]) || null;
+  // У KLM нет исполнения 3P: 3L+PE (корпус) и 3L+N+PE (корпус) — 4P,
+  // отдельный защитный проводник в 3L+N+PE — 5P.
+  const poles = hasNeutralAndPe ? 5 : hasNeutral ? 4 : sourcePoles === 5 ? 5 : sourcePoles === 3 || sourcePoles === 4 ? 4 : null;
   const missing = [!kind && "тип элемента", !current && "номинальный ток", !material && "материал шин", !ip && "IP", !poles && "число проводников"].filter(Boolean) as string[];
   const characteristics = [current && `${current} А`, material, ip && `IP${ip}`, poles && `${poles}P`].filter(Boolean).map(String);
-  const klmSeries = current != null && current <= 800 ? "KLM-R" : "KLM-S", label = kind?.label ?? "Элемент шинопровода";
-  return { ...row, manufacturer: brand?.name ?? "Не определён", catalogName: brand ? `${brand.name}${series ? ` · ${series}` : ""}` : null, series, characteristics, missingCharacteristics: missing, klmName: `${label}${current ? ` ${current} А` : ""}${material ? ` ${material}` : ""}${ip ? ` IP${ip}` : ""}${poles ? ` ${poles}P` : ""}`, klmArticle: [klmSeries, kind?.code ?? "CHECK", current, material, ip && `IP${ip}`, poles && `${poles}P`].filter(Boolean).join("-"), klmQuantity: row.quantity, confidence: Math.max(20, 100 - missing.length * 16 - (!brand ? 8 : 0)), status: missing.length <= 1 ? "matched" : "review" };
+  const label = kind?.label ?? "Элемент шинопровода";
+  const confirmedArticle = current == null
+    ? null
+    : kind?.code === "S"
+      ? `SHMA-${current}A`
+      : kind?.code === "PI"
+        ? `SHRA-${current}A`
+      : kind?.code === "PB"
+        ? `TAPP-OFF-${current}A`
+        : null;
+  const requiresReview = missing.length > 0 || confirmedArticle == null;
+  return { ...row, manufacturer: brand?.name ?? "Не определён", catalogName: brand ? `${brand.name}${series ? ` · ${series}` : ""}` : null, series, characteristics, missingCharacteristics: missing, klmName: `${label}${current ? ` ${current} А` : ""}${material ? ` ${material}` : ""}${ip ? ` IP${ip}` : ""}${poles ? ` ${poles}P` : ""}`, klmArticle: confirmedArticle ?? "Требуется заводской артикул", klmQuantity: row.quantity, confidence: Math.max(20, 100 - missing.length * 16 - (!brand ? 8 : 0)), status: requiresReview ? "review" : "matched" };
 }
 export const convertRows = (rows: SourceRow[]) => rows.map(convertRow);
