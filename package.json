@@ -5,6 +5,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "cf:build": "opennextjs-cloudflare build",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf:typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "start": "next start",
     "lint": "eslint",
     "test": "tsx --test lib/core/*.test.ts lib/*.test.ts lib/auth/*.test.ts",
@@ -17,7 +21,6 @@
     "catalog:makinteh": "node scripts/scrape-makinteh-trays.cjs && node scripts/build-tray-catalog-index.cjs"
   },
   "dependencies": {
-    "@node-rs/argon2": "^2.0.2",
     "@tesseract.js-data/eng": "^1.0.0",
     "@tesseract.js-data/rus": "^1.0.0",
     "drizzle-orm": "^0.45.2",
@@ -31,6 +34,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.20.6",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19.2.18",
@@ -40,6 +44,7 @@
     "eslint-config-next": "^16.3.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "^4.128.0"
   }
 }

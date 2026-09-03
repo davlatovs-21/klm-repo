@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkPasswordStrength, hashPassword, verifyPassword, ARGON_OPTIONS, PASSWORD_MIN_LENGTH } from "./password";
+import { checkPasswordStrength, hashPassword, verifyPassword, PBKDF2_OPTIONS, PASSWORD_MIN_LENGTH } from "./password";
 import { issueToken, verifySignature, hashToken } from "./token";
 import { maskSecrets } from "../audit/mask";
 import { can, DISCOUNT_LIMITS, MATRIX } from "../dal/permissions";
@@ -9,10 +9,10 @@ process.env.SESSION_SECRET ??= "тестовый-секрет-длиннее-т�
 
 /* ── пароли ─────────────────────────────────────────────────────── */
 
-test("пароль хешируется argon2id с параметрами из ТЗ", async () => {
+test("пароль хешируется PBKDF2-SHA-256 через Web Crypto", async () => {
   const h = await hashPassword("достаточно-длинный-пароль");
-  assert.ok(h.startsWith("$argon2id$"), "алгоритм argon2id");
-  assert.match(h, new RegExp(`m=${ARGON_OPTIONS.memoryCost},t=${ARGON_OPTIONS.timeCost},p=${ARGON_OPTIONS.parallelism}`));
+  assert.ok(h.startsWith("$pbkdf2-sha256$"), "алгоритм и версия записаны в хеше");
+  assert.match(h, new RegExp(`\\$i=${PBKDF2_OPTIONS.iterations}\\$`));
 });
 
 test("проверка пароля: верный проходит, неверный нет", async () => {
@@ -31,6 +31,7 @@ test("битый или пустой хеш не пускает внутрь и 
   assert.equal(await verifyPassword("", "любой"), false);
   assert.equal(await verifyPassword("не-хеш-вообще", "любой"), false);
   assert.equal(await verifyPassword("$argon2id$сломано", "любой"), false);
+  assert.equal(await verifyPassword("$pbkdf2-sha256$i=999999999$bad$bad", "любой"), false);
 });
 
 test("короткие и утёкшие пароли отклоняются", () => {

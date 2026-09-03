@@ -16,6 +16,12 @@
 # next.js
 /.next/
 /out/
+/.open-next/
+/.wrangler/
+
+# Cloudflare local secrets and generated types
+.dev.vars
+cloudflare-env.d.ts
 
 # production
 /build
