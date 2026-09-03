@@ -10,8 +10,11 @@ test("распознаёт заголовки и строки специфика
 
 test("подбирает лоток KLM по типу и габаритам", () => {
   const row = convertRow({ position: "1", name: "Лоток перфорированный 200x80x3000", article: "", quantity: 10, unit: "шт" });
-  assert.equal(row.klmArticle, "KLM-L-200x80x3000");
-  assert.equal(row.status, "matched");
+  assert.equal(row.kind, "tray");
+  assert.equal(row.trayDesign, "perforated");
+  assert.equal(row.klmArticle, "KLM-LP-200x80x3000");
+  assert.equal(row.status, "review");
+  assert.deepEqual(row.missingCharacteristics, ["толщина", "покрытие"]);
 });
 
 test("пересчитывает метры в трёхметровые секции", () => {
@@ -28,8 +31,9 @@ test("определяет производителя по бренду и ха�
 test("находит описание по одному артикулу из каталожного индекса", () => {
   const row = convertRow({ position: "1", name: "Позиция по каталогу", article: "L355001-0,55", quantity: 3, unit: "шт" });
   assert.equal(row.manufacturer, "EKF");
-  assert.equal(row.width, 35);
-  assert.equal(row.height, 50);
+  assert.equal(row.width, 50);
+  assert.equal(row.height, 35);
+  assert.equal(row.thickness, 0.55);
   assert.equal(row.confidence, 99);
 });
 
@@ -40,4 +44,17 @@ test("распознаёт производителя и модель EAE", () =
   assert.equal(row.width, 200);
   assert.equal(row.height, 100);
   assert.equal(row.confidence, 99);
+});
+
+test("определяет производителя по кириллическому написанию бренда", () => {
+  assert.equal(detectManufacturer("Лоток ДКС 100x50", ""), "DKC");
+  assert.equal(detectManufacturer("Лоток ИЭК", ""), "IEK");
+  assert.equal(detectManufacturer("Лоток ОСТЕК", ""), "OSTEC");
+});
+
+test("читает толщину стали из наименования", () => {
+  const row = convertRow({ position: "1", name: "Лоток перфорированный 100x50x3000, толщина 1,2 мм, оцинкованный", article: "", quantity: 1, unit: "шт" });
+  assert.equal(row.thickness, 1.2);
+  assert.equal(row.coating, "сталь Сендзимир");
+  assert.equal(row.status, "matched");
 });

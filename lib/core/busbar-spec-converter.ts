@@ -3,13 +3,14 @@ import { RATED_CODE } from "./klm-catalog";
 export type SourceRow = { position: string; name: string; article: string; quantity: number; unit: string };
 export type ConvertedRow = SourceRow & { manufacturer: string; catalogName: string | null; series: string | null; characteristics: string[]; missingCharacteristics: string[]; klmName: string; klmArticle: string; klmQuantity: number; confidence: number; status: "matched" | "review" };
 
+// Границы вокруг кириллицы — юникодными lookaround-ами, а не \b (он ASCII-only).
 const BRANDS = [
   { name: "PitON Electric", re: /piton|питон|\b(?:e3|cr1|crm|a5|l1|et|d4)[-_ ]/i, series: /\b(e3|cr1|crm|a5|l1|et|d4)\b/i },
   { name: "Schneider Electric", re: /schneider|canalis|\b(kta|ktc|ks|kn|kba|kbb)\b/i, series: /\b(canalis\s*)?(kta|ktc|ks|kn|kba|kbb)\b/i },
   { name: "Siemens", re: /siemens|sivacon|8ps|\b(bd01|bd2|ld|li)\b/i, series: /\b(sivacon\s*8ps|bd01|bd2|ld|li)\b/i },
   { name: "Legrand", re: /legrand|zucchini|\b(lbplus|mr|ms|hr|scp)\b/i, series: /\b(zucchini|lbplus|mr|ms|hr|scp)\b/i },
   { name: "EAE", re: /\beae\b|e[- ]?line|\b(kx|ko-ii|kd|mk|kl|cr|ccr)\b/i, series: /\b(e[- ]?line\s*)?(kx(?:-ii|-iii)?|ko-ii|kd|mk|kl|cr|ccr)\b/i },
-  { name: "ДКС", re: /\b(dkc|дкс)\b|hercules|powertech|distritech|vibitech|lightech/i, series: /\b(hercules|powertech|distritech|vibitech|lightech)\b/i },
+  { name: "ДКС", re: /(?<![\p{L}\d])(dkc|дкс)(?![\p{L}\d])|hercules|powertech|distritech|vibitech|lightech/iu, series: /\b(hercules|powertech|distritech|vibitech|lightech)\b/i },
 ] as const;
 const KINDS = [
   { label: "Коробка отбора мощности", code: "PB", re: /коробк.*отбор|tap[- ]?off|plug[- ]?in box/i },
@@ -42,7 +43,7 @@ function convertRow(row: SourceRow): ConvertedRow {
   const pitonArticle = text.match(/\b(?:e3|cr1|crm|a5|l1|et|d4)-(\d{2})-(al|cu)-([345])-(\d{2,4})\b/i);
   const currentMatch = text.match(/\b(25|40|63|100|125|140|160|200|225|250|315|400|500|600|630|800|1000|1250|1600|2000|2500|3200|4000|5000|6300|6400|7500)\s*(?:а|a|amp)(?=$|[^a-zа-яё0-9])/i);
   const current = currentMatch ? Number(currentMatch[1]) : pitonArticle ? Number(pitonArticle[4]) : null;
-  const material = /\b(cu|медн|медь)\b/i.test(text) ? "Cu" : /\b(al|алюм)\b/i.test(text) ? "Al" : null;
+  const material = /(?<![\p{L}\d])(?:cu(?![\p{L}\d])|мед[ьн])/iu.test(text) ? "Cu" : /(?<![\p{L}\d])(?:al(?![\p{L}\d])|алюм)/iu.test(text) ? "Al" : null;
   const ip = Number(text.match(/\bip\s*(\d{2})\b/i)?.[1] ?? pitonArticle?.[1]) || null;
   const hasNeutralAndPe = /3\s*(?:p|l|ф)\s*\+\s*n\s*\+\s*pe\b/i.test(text);
   const hasNeutral = /3\s*(?:p|l|ф)\s*\+\s*n\b/i.test(text);
