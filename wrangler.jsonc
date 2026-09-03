@@ -2,6 +2,11 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "klm-repo",
   "main": ".open-next/worker.js",
+  // Собираем воркер сам, а не полагаемся на поле Build command в дашборде:
+  // .open-next/ в репозитории нет, и без этой сборки деплоить нечего.
+  "build": {
+    "command": "npx opennextjs-cloudflare build"
+  },
   "compatibility_date": "2026-09-03",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": {
