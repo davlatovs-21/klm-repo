@@ -19,6 +19,10 @@
 
 # production
 /build
+/.open-next/
+/.wrangler/
+/demo-hosting/
+/tmp/
 
 # misc
 .DS_Store
