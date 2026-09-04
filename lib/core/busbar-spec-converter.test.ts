@@ -66,3 +66,29 @@ test("формирует заводской артикул горизонтал�
   assert.equal(result.klmArticle, "KLM-S-20-Al-55-5-3-CD");
   assert.equal(result.status, "matched");
 });
+
+test("считает соединительную секцию и крышку соединения стыковочными элементами", () => {
+  const rows = convertRows([
+    { position: "3.34", name: "Крышка соединения", article: "1.М.2-3-2000А", quantity: 1, unit: "шт" },
+    { position: "3.35", name: "Соединительная секция 2000A Al IP55 5P", article: "", quantity: 2, unit: "шт" },
+  ]);
+
+  assert.equal(rows[0].klmName, "Стыковочный элемент 2000 А");
+  assert.ok(!rows[0].missingCharacteristics.includes("тип элемента"));
+  assert.equal(rows[1].klmName, "Стыковочный элемент 2000 А Al IP55 5P");
+  assert.equal(rows[1].klmArticle, "KLM-S-20-Al-55-5-3-G");
+  assert.equal(rows[1].status, "matched");
+});
+
+test("распознаёт варианты элементов из импортированной спецификации", () => {
+  const rows = convertRows([
+    { position: "3.33", name: "Коробка отвода мощности, пустая, 3P+N+Pe, 250A", article: "", quantity: 1, unit: "шт" },
+    { position: "3.36", name: "Секция вертикальная Z-образная, тип 2, Al, 3P+N+Pe, 4000A, IP55", article: "", quantity: 1, unit: "шт" },
+  ]);
+
+  assert.equal(rows[0].klmName, "Коробка отбора мощности 250 А 5P");
+  assert.ok(!rows[0].missingCharacteristics.includes("тип элемента"));
+  assert.equal(rows[1].klmName, "Секция Z-образная вертикальная 4000 А Al IP55 5P");
+  assert.equal(rows[1].klmArticle, "KLM-S-40-Al-55-5-3-ZP");
+  assert.equal(rows[1].status, "matched");
+});
