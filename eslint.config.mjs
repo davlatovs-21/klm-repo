@@ -9,6 +9,8 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    // Сборочный вывод Vercel (`vercel build`) — не наш код.
+    ".vercel/**",
     "demo-hosting/**",
     "online-store-klm/**",
     "public/ocr/**",

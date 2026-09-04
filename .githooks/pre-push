@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+# Прогоняет те же проверки, что и сборка на Vercel, до отправки коммитов.
+# Vercel собирает каждую запушенную ветку, поэтому дешевле упасть здесь.
+#
+# Пропустить один раз: git push --no-verify
+
+set -e
+
+echo "pre-push: running verification (skip with --no-verify)"
+npm run verify
+
+echo "pre-push: OK"
