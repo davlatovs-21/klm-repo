@@ -33,7 +33,7 @@
 | Стили | Tailwind CSS 4 через `@tailwindcss/postcss`, собственные глобальные стили |
 | База | PostgreSQL |
 | ORM и миграции | Drizzle ORM `0.45.x`, Drizzle Kit `0.31.x` |
-| Пароли | PBKDF2-SHA-256 через стандартный Web Crypto API (Node.js и Cloudflare Workers) |
+| Пароли | PBKDF2-SHA-256 через стандартный Web Crypto API |
 | Импорт таблиц | `xlsx` |
 | PDF/OCR | `pdfjs-dist`, `tesseract.js`, локальные OCR worker/core/language assets |
 | Тесты | Node test runner через `tsx --test` |
@@ -48,8 +48,6 @@
 - [`eslint.config.mjs`](eslint.config.mjs) — ESLint;
 - [`drizzle.config.ts`](drizzle.config.ts) — конфигурация миграций;
 - [`proxy.ts`](proxy.ts) — защита маршрутов в Next.js 16;
-- [`open-next.config.ts`](open-next.config.ts) — адаптер Next.js для Cloudflare Workers;
-- [`wrangler.jsonc`](wrangler.jsonc) — Worker entrypoint, compatibility date и static assets;
 - [`AGENTS.md`](AGENTS.md) — важное правило проекта: перед изменением Next.js-кода читать документацию установленной версии из `node_modules/next/dist/docs/`.
 
 ## 3. Самый надёжный способ переноса
@@ -443,10 +441,6 @@ npm.cmd run dev
 |---|---|
 | `npm run dev` | dev-сервер Next.js |
 | `npm run build` | production-сборка |
-| `npm run cf:build` | сборка Cloudflare Worker через OpenNext |
-| `npm run preview` | локальная сборка и preview в Workers runtime |
-| `npm run deploy` | сборка и деплой Worker через OpenNext |
-| `npm run cf:typegen` | типы Cloudflare bindings |
 | `npm run start` | запуск production-сборки |
 | `npm run lint` | ESLint |
 | `npm test` | тесты ядра, заявок, auth и истории без БД |
@@ -505,7 +499,7 @@ npm run test:db
 - Часть данных получена OCR из PDF без текстового слоя; при обновлении каталога нужна повторная верификация.
 - Не заменять каталожные значения догадками: неизвестное значение должно давать предупреждение или блокировать зависящий результат.
 - В dev-режиме был замечен hydration warning на `/app/busbar-converter`: текст шага SSR отличался от клиентского текста. Перед production-релизом следует проверить детерминированность списка шагов в `TraySpecificationConverter.tsx` и отсутствие зависимости первого render от browser-only состояния.
-- Нативный `@node-rs/argon2` удалён ради совместимости с Cloudflare Workers. Старые строки `$argon2id$...` в базе Worker проверить не может: существующим пользователям нужен сброс пароля или отдельная серверная миграция на Node.js до переключения трафика.
+- Нативный `@node-rs/argon2` удалён в пользу Web Crypto. Старые строки `$argon2id$...` новый код проверить не может: существующим пользователям нужен сброс пароля или отдельная миграция хешей до переключения трафика.
 
 ## 14. Что не смешивать с основным приложением
 

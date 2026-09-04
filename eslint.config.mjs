@@ -9,8 +9,6 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
-    ".open-next/**",
-    ".wrangler/**",
     "demo-hosting/**",
     "online-store-klm/**",
     "public/ocr/**",
