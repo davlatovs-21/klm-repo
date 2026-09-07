@@ -1,4 +1,4 @@
-import { RATED_CODE } from "./klm-catalog";
+import { RATED_CODE, boxFor, TAP_BOXES_S, TAP_WINDOW_MAX_S } from "./klm-catalog";
 
 export type SourceRow = { position: string; name: string; article: string; quantity: number; unit: string };
 export type ConvertedRow = SourceRow & { manufacturer: string; catalogName: string | null; series: string | null; characteristics: string[]; missingCharacteristics: string[]; klmName: string; klmArticle: string; klmQuantity: number; confidence: number; status: "matched" | "review" };
@@ -13,7 +13,7 @@ const BRANDS = [
   { name: "ДКС", re: /(?<![\p{L}\d])(dkc|дкс)(?![\p{L}\d])|hercules|powertech|distritech|vibitech|lightech/iu, series: /\b(hercules|powertech|distritech|vibitech|lightech)\b/i },
 ] as const;
 const KINDS = [
-  { label: "Коробка отбора мощности", code: "PB", re: /коробк.*(?:отбор|отвод).*мощност|tap[- ]?off|plug[- ]?in box/i },
+  { label: "Коробка отбора мощности", code: "PB", re: /коробк.*(?:отбор|отвод|ответв)|ответвительн.*коробк|(?<![\p{L}\d])ком(?![\p{L}\d])|tapp?[- ]?off|(?:plug[- ]?in|bolt[- ]?on)\s*box/iu },
   { label: "Противопожарная проходка", code: "FB", re: /огнестой|противопожар|fire barrier/i },
   { label: "Секция угловая горизонтальная", code: "CD", re: /горизонт.*уг|уг.*горизонт|horizontal elbow/i },
   { label: "Секция угловая вертикальная", code: "CP", re: /вертикал.*уг|уг.*вертикал|vertical elbow/i },
@@ -30,6 +30,46 @@ const KINDS = [
 ] as const;
 const number = (value: unknown, fallback = 0) => { const parsed = Number(String(value ?? "").replace(/\s/g, "").replace(",", ".")); return Number.isFinite(parsed) ? parsed : fallback; };
 
+function convertTapBox(row: SourceRow, manufacturer: string, series: string | null): ConvertedRow {
+  const text = `${row.name} ${row.article}`;
+  // Ток коробки имеет собственный ряд, отличный от номиналов магистрали.
+  const currents = [...row.name.matchAll(/(?<![\p{L}\d])(\d+(?:[.,]\d+)?)\s*(?:amp|[аa])(?=$|[^\p{L}\d])/giu)]
+    .map((match) => Number(match[1].replace(",", ".")));
+  const articleCurrent = row.article.match(/(?<!\d)(\d+)\s*[аa](?=$|[^\p{L}\d])/iu);
+  const current = currents[0] ?? (articleCurrent ? Number(articleCurrent[1]) : null);
+  const ip = Number(text.match(/\bip\s*(\d{2})\b/i)?.[1]) || null;
+  const poles = /3\s*[plф]\s*\+\s*n\s*\+\s*pe\b/i.test(text) ? 5
+    : Number(text.match(/\b([345])\s*p\b/i)?.[1]) || null;
+  const box = current != null && current > 0 ? boxFor(current) : null;
+  const empty = /пуст|без\s+(?:автомат|аппарат)|empty|without\s+(?:breaker|device)/i.test(text);
+  const boltOn = /bolt[- ]?on/i.test(text);
+  const missing = [
+    current == null && "номинальный ток",
+    new Set(currents).size > 1 && "уточнить ток отвода: указано несколько токов",
+    current != null && !box && "нет подходящего артикула в справочнике TAPP-OFF",
+    box && box.ratedA !== current && `согласовать корпус ${box.ratedA} А и аппарат защиты на ${current} А`,
+    !ip && "IP",
+    box && ip && !box.ip.includes(ip) && `IP${ip} отсутствует в ряду коробок KLM`,
+    !poles && "число полюсов коробки",
+    box && poles && !box.poles.includes(poles) && "уточнить исполнение полюсов коробки",
+    empty && "пустой корпус: требуется исполнение без аппарата защиты",
+    boltOn && "уточнить заводской артикул коробки Bolt-on",
+    "проверить совместимость коробки с серией шинопровода и способом подключения",
+  ].filter(Boolean) as string[];
+  const characteristics = [current && `${current} А`, ip && `IP${ip}`, poles && `${poles}P`,
+    box && `Каталог KLM: ${box.name}, ${box.device}`,
+    !box && current != null && TAP_BOXES_S.includes(current) && current > TAP_WINDOW_MAX_S && `Каталог KLM-S: Bolt-on ${current} А`,
+  ].filter(Boolean).map(String);
+  const compatible = box && (!ip || box.ip.includes(ip)) && (!poles || box.poles.includes(poles)) && !empty && !boltOn && new Set(currents).size <= 1;
+  return {
+    ...row, manufacturer, series, catalogName: manufacturer === "Не определён" ? null : `${manufacturer}${series ? ` · ${series}` : ""}`,
+    characteristics, missingCharacteristics: missing,
+    klmName: `Коробка отбора мощности${box ? ` ${box.ratedA} А` : current ? ` ${current} А` : ""}${ip ? ` IP${ip}` : ""}${poles ? ` ${poles}P` : ""}`,
+    klmArticle: compatible ? box.sku : "Требуется заводской артикул",
+    klmQuantity: row.quantity, confidence: Math.max(20, 100 - missing.length * 16), status: "review",
+  };
+}
+
 export function rowsFromMatrix(matrix: unknown[][]): SourceRow[] {
   if (!matrix.length) return [];
   const labels = matrix[0].map((cell) => String(cell ?? "").toLowerCase().trim());
@@ -42,6 +82,7 @@ export function rowsFromMatrix(matrix: unknown[][]): SourceRow[] {
 function convertRow(row: SourceRow): ConvertedRow {
   const text = `${row.name} ${row.article}`;
   const brand = BRANDS.find((item) => item.re.test(text)), series = brand?.series.exec(text)?.[0] ?? null, kind = KINDS.find((item) => item.re.test(text));
+  if (kind?.code === "PB") return convertTapBox(row, brand?.name ?? "Не определён", series);
   const pitonArticle = text.match(/\b(?:e3|cr1|crm|a5|l1|et|d4)-(\d{2})-(al|cu)-([345])-(\d{2,4})\b/i);
   const currentMatch = text.match(/\b(25|40|63|100|125|140|160|200|225|250|315|400|500|600|630|800|1000|1250|1600|2000|2500|3200|4000|5000|6300|6400|7500)\s*(?:а|a|amp)(?=$|[^a-zа-яё0-9])/i);
   const current = currentMatch ? Number(currentMatch[1]) : pitonArticle ? Number(pitonArticle[4]) : null;

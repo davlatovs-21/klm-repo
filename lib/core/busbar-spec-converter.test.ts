@@ -1,6 +1,49 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { convertRows, rowsFromMatrix } from "./busbar-spec-converter";
+import { TAP_BOXES_FULL } from "./klm-catalog";
+
+test("подбирает коробки по всем номиналам справочника KLM без материала шин", () => {
+  for (const box of TAP_BOXES_FULL) {
+    const [result] = convertRows(rowsFromMatrix([
+      ["Поз.", "Наименование", "Артикул", "Кол-во", "Ед."],
+      [7, `EAE коробка отбора ${box.ratedA}A IP55 4P`, "", 12, "шт"],
+    ]));
+    assert.equal(result.klmArticle, box.sku);
+    assert.equal(result.klmQuantity, 12);
+    assert.ok(!result.missingCharacteristics.includes("материал шин"));
+    assert.ok(!result.missingCharacteristics.includes("номинал отсутствует в ряду KLM-S"));
+    assert.equal(result.status, "review"); // Совместимость с трассой не задана в строке.
+  }
+});
+
+test("распознаёт сокращения и варианты названия коробки", () => {
+  for (const name of ["КОМ", "Ответвительная коробка", "Коробка ответвительная", "Коробка отвода", "Tap-off box", "Tapp-off", "Plug-in box"]) {
+    const [result] = convertRows([{ position: "1", name: `${name} 63A IP54 4P`, article: "", quantity: 2, unit: "шт" }]);
+    assert.equal(result.klmArticle, "TAPP-OFF-63A", name);
+  }
+});
+
+test("промежуточный ток требует согласования аппарата, а не становится номиналом магистрали", () => {
+  const [result] = convertRows([{ position: "1", name: "КОМ 100A IP55 4P", article: "", quantity: 1, unit: "шт" }]);
+  assert.equal(result.klmArticle, "TAPP-OFF-125A");
+  assert.match(result.klmName, /125 А/);
+  assert.ok(result.missingCharacteristics.some((item) => item.includes("аппарат защиты на 100 А")));
+});
+
+test("не подменяет пустые, несовместимые и неоднозначные коробки готовым TAPP-OFF", () => {
+  for (const name of ["КОМ пустая 250A IP55 4P", "КОМ 250A IP65 4P", "КОМ 250A IP55 3P", "Bolt-on box 250A IP55 4P", "КОМ 250A, автомат 160A IP55 4P", "КОМ 1600A IP55 4P"]) {
+    const [result] = convertRows([{ position: "1", name, article: "", quantity: 1, unit: "шт" }]);
+    assert.equal(result.klmArticle, "Требуется заводской артикул", name);
+    assert.equal(result.status, "review");
+  }
+});
+
+test("для коробки 800 А показывает каталог KLM-S Bolt-on и необходимость заводского артикула", () => {
+  const [result] = convertRows([{ position: "1", name: "Коробка отбора 800A IP55 5P", article: "", quantity: 3, unit: "шт" }]);
+  assert.ok(result.characteristics.includes("Каталог KLM-S: Bolt-on 800 А"));
+  assert.equal(result.klmArticle, "Требуется заводской артикул");
+});
 
 test("распознаёт Canalis и формирует аналог прямой секции KLM", () => {
   const rows = rowsFromMatrix([
